@@ -1,17 +1,17 @@
 // PAVE Admin - Dashboard Layout with Sidebar
 
-import { useState } from 'react';
-import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { useState } from "react";
+import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 import {
   LayoutDashboard,
   Users,
@@ -25,17 +25,21 @@ import {
   X,
   ChevronDown,
   Bell,
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 const navItems = [
-  { path: '/dashboard', label: 'Overview', icon: LayoutDashboard },
-  { path: '/dashboard/users', label: 'Users', icon: Users },
-  { path: '/dashboard/kyc', label: 'KYC Review', icon: FileCheck },
-  { path: '/dashboard/wallets', label: 'Wallets', icon: Wallet },
-  { path: '/dashboard/transactions', label: 'Transactions', icon: ArrowLeftRight },
-  { path: '/dashboard/savings', label: 'Savings', icon: PiggyBank },
-  { path: '/dashboard/thrift', label: 'Thrift Plans', icon: UsersRound },
+  { path: "/dashboard", label: "Overview", icon: LayoutDashboard },
+  { path: "/dashboard/users", label: "Users", icon: Users },
+  { path: "/dashboard/kyc", label: "KYC Review", icon: FileCheck },
+  { path: "/dashboard/wallets", label: "Wallets", icon: Wallet },
+  {
+    path: "/dashboard/transactions",
+    label: "Transactions",
+    icon: ArrowLeftRight,
+  },
+  { path: "/dashboard/savings", label: "Savings", icon: PiggyBank },
+  { path: "/dashboard/thrift", label: "Thrift Plans", icon: UsersRound },
 ];
 
 export default function DashboardLayout() {
@@ -46,12 +50,12 @@ export default function DashboardLayout() {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   const isActivePath = (path: string) => {
-    if (path === '/dashboard') {
-      return location.pathname === '/dashboard';
+    if (path === "/dashboard") {
+      return location.pathname === "/dashboard";
     }
     return location.pathname.startsWith(path);
   };
@@ -74,19 +78,21 @@ export default function DashboardLayout() {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed lg:static inset-y-0 left-0 z-50 w-64 bg-sidebar transition-transform duration-300 ease-in-out lg:translate-x-0',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          "fixed lg:static inset-y-0 left-0 z-50 w-64 bg-sidebar transition-transform duration-300 ease-in-out lg:translate-x-0",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="p-6 flex items-center justify-between">
             <Link to="/dashboard" className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-sidebar-primary rounded-xl flex items-center justify-center">
-                <Wallet className="w-5 h-5 text-white" />
-              </div>
+              <img
+                src="/pave_logo.png"
+                alt="PAVE Admin Hub"
+                className="w-10 h-10 rounded-xl"
+              />
               <span className="text-lg font-bold text-sidebar-foreground font-display">
-                PAVE Admin
+                PAVE Admin Hub
               </span>
             </Link>
             <button
@@ -107,10 +113,7 @@ export default function DashboardLayout() {
                   key={item.path}
                   to={item.path}
                   onClick={() => setSidebarOpen(false)}
-                  className={cn(
-                    'nav-item',
-                    isActive && 'nav-item-active'
-                  )}
+                  className={cn("nav-item", isActive && "nav-item-active")}
                 >
                   <Icon className="w-5 h-5" />
                   {item.label}
@@ -123,7 +126,10 @@ export default function DashboardLayout() {
           <div className="p-4 border-t border-sidebar-border">
             <div className="flex items-center gap-3 px-2">
               <img
-                src={admin?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${admin?.name}`}
+                src={
+                  admin?.avatar ||
+                  `https://api.dicebear.com/7.x/avataaars/svg?seed=${admin?.name}`
+                }
                 alt={admin?.name}
                 className="w-10 h-10 rounded-full bg-sidebar-accent"
               />
@@ -132,7 +138,7 @@ export default function DashboardLayout() {
                   {admin?.name}
                 </p>
                 <p className="text-xs text-sidebar-foreground/60 truncate">
-                  {admin?.role === 'super_admin' ? 'Super Admin' : 'Admin'}
+                  {admin?.role === "super_admin" ? "Super Admin" : "Admin"}
                 </p>
               </div>
             </div>
@@ -166,12 +172,15 @@ export default function DashboardLayout() {
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-muted transition-colors">
                     <img
-                      src={admin?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${admin?.name}`}
+                      src={
+                        admin?.avatar ||
+                        `https://api.dicebear.com/7.x/avataaars/svg?seed=${admin?.name}`
+                      }
                       alt={admin?.name}
                       className="w-8 h-8 rounded-full"
                     />
                     <span className="hidden sm:block text-sm font-medium">
-                      {admin?.name?.split(' ')[0]}
+                      {admin?.name?.split(" ")[0]}
                     </span>
                     <ChevronDown className="w-4 h-4 text-muted-foreground" />
                   </button>
@@ -179,10 +188,15 @@ export default function DashboardLayout() {
                 <DropdownMenuContent align="end" className="w-48">
                   <div className="px-2 py-1.5">
                     <p className="text-sm font-medium">{admin?.name}</p>
-                    <p className="text-xs text-muted-foreground">{admin?.email}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {admin?.email}
+                    </p>
                   </div>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+                  <DropdownMenuItem
+                    onClick={handleLogout}
+                    className="text-destructive focus:text-destructive"
+                  >
                     <LogOut className="w-4 h-4 mr-2" />
                     Log out
                   </DropdownMenuItem>

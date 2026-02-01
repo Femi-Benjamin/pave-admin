@@ -1,23 +1,23 @@
 // PAVE Admin - Forgot Password Page
 
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { authService } from '@/services/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { ArrowLeft, Loader2, Mail, Wallet, CheckCircle2 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { authService } from "@/services/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ArrowLeft, Loader2, Mail, Wallet, CheckCircle2 } from "lucide-react";
+import { motion } from "framer-motion";
 
 export default function ForgotPassword() {
-  const [email, setEmail] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setIsLoading(true);
 
     const result = await authService.forgotPassword(email);
@@ -25,7 +25,7 @@ export default function ForgotPassword() {
     if (result.success) {
       setIsSuccess(true);
     } else {
-      setError(result.error || 'Failed to send reset link');
+      setError(result.error || "Failed to send reset link");
     }
 
     setIsLoading(false);
@@ -41,10 +41,14 @@ export default function ForgotPassword() {
       >
         {/* Logo */}
         <div className="flex items-center justify-center gap-3 mb-8">
-          <div className="w-12 h-12 gradient-hero rounded-xl flex items-center justify-center">
-            <Wallet className="w-6 h-6 text-white" />
-          </div>
-          <span className="text-2xl font-bold text-foreground font-display">PAVE Admin</span>
+          <img
+            src="/pave_logo.png"
+            alt="PAVE Admin Hub"
+            className="w-12 h-12 rounded-xl"
+          />
+          <span className="text-2xl font-bold text-foreground font-display">
+            PAVE Admin Hub
+          </span>
         </div>
 
         {isSuccess ? (
@@ -56,9 +60,12 @@ export default function ForgotPassword() {
             <div className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle2 className="w-8 h-8 text-success" />
             </div>
-            <h2 className="text-2xl font-bold text-foreground mb-2">Check your email</h2>
+            <h2 className="text-2xl font-bold text-foreground mb-2">
+              Check your email
+            </h2>
             <p className="text-muted-foreground mb-8">
-              We've sent a password reset link to <span className="text-foreground font-medium">{email}</span>
+              We've sent a password reset link to{" "}
+              <span className="text-foreground font-medium">{email}</span>
             </p>
             <Link to="/login">
               <Button variant="outline" className="w-full h-12">
@@ -73,7 +80,9 @@ export default function ForgotPassword() {
               <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Mail className="w-8 h-8 text-primary" />
               </div>
-              <h2 className="text-2xl font-bold text-foreground mb-2">Forgot password?</h2>
+              <h2 className="text-2xl font-bold text-foreground mb-2">
+                Forgot password?
+              </h2>
               <p className="text-muted-foreground">
                 Enter your email and we'll send you a reset link
               </p>
@@ -115,12 +124,15 @@ export default function ForgotPassword() {
                     Sending...
                   </>
                 ) : (
-                  'Send reset link'
+                  "Send reset link"
                 )}
               </Button>
 
               <Link to="/login">
-                <Button variant="ghost" className="w-full h-12 text-muted-foreground">
+                <Button
+                  variant="ghost"
+                  className="w-full h-12 text-muted-foreground"
+                >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back to login
                 </Button>
