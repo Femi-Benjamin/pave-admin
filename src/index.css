@@ -1,17 +1,16 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@300;400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* PAVE Admin - Fintech Design System
-   Purple-first, clean, modern fintech UI inspired by PiggyVest
-   All colors in HSL format
-*/
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
-
 @layer base {
   :root {
-    /* Core brand colors - Purple theme */
+    --font-family-display: 'Bricolage Grotesque', sans-serif;
+    --font-family-body: 'DM Sans', sans-serif;
+    --font-family-mono: 'DM Mono', monospace;
+    
+    /* Core brand colors */
     --background: 0 0% 98%;
     --foreground: 222 47% 11%;
     
@@ -133,18 +132,20 @@
     @apply border-border;
   }
   
-  html {
-    @apply scroll-smooth;
+  html, body, #root {
+    @apply h-full w-full overflow-hidden;
+    margin: 0;
+    padding: 0;
   }
   
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', 'DM Sans', system-ui, sans-serif;
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-family-body), 'DM Sans', system-ui, sans-serif;
   }
   
   h1, h2, h3, h4, h5, h6 {
     @apply font-semibold tracking-tight;
-    font-family: 'DM Sans', 'Inter', system-ui, sans-serif;
+    font-family: var(--font-family-display), 'Bricolage Grotesque', sans-serif;
   }
 }
 

@@ -55,6 +55,15 @@ export const formatDateTime = (date: string): string => {
 export const mockAdminUsers: AdminUser[] = [
   {
     id: 'admin_001',
+    name: 'Benjamin Okonkwo',
+    email: 'benjamin@pave.com',
+    role: 'super_admin',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Benjamin',
+    createdAt: '2024-01-15T08:00:00Z',
+    lastLoginAt: '2025-01-26T09:30:00Z',
+  },
+  {
+    id: 'admin_003',
     name: 'Chinedu Okonkwo',
     email: 'chinedu@pave.ng',
     role: 'super_admin',

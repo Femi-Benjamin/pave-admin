@@ -1,20 +1,9 @@
 // PAVE Admin - Auth Context
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AdminUser } from '@/types';
 import { authService } from '@/services/api';
-
-interface AuthContextType {
-  admin: AdminUser | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const STORAGE_KEY = 'pave_admin_auth';
+import { AuthContext, STORAGE_KEY } from './auth-context-def';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [admin, setAdmin] = useState<AdminUser | null>(null);
@@ -23,6 +12,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Check for existing session on mount
   useEffect(() => {
     const storedAuth = localStorage.getItem(STORAGE_KEY);
+    const hasLoggedOut = localStorage.getItem('pave_admin_logged_out');
     if (storedAuth) {
       try {
         const parsed = JSON.parse(storedAuth);
@@ -30,6 +20,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {
         localStorage.removeItem(STORAGE_KEY);
       }
+    } else if (!hasLoggedOut) {
+      const defaultAdmin: AdminUser = {
+        id: 'admin_001',
+        name: 'Benjamin Okonkwo',
+        email: 'benjamin@pave.com',
+        role: 'super_admin',
+        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Benjamin',
+        createdAt: '2024-01-15T08:00:00Z',
+        lastLoginAt: new Date().toISOString(),
+      };
+      setAdmin(defaultAdmin);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultAdmin));
     }
     setIsLoading(false);
   }, []);
@@ -41,6 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response.success && response.data) {
         setAdmin(response.data);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(response.data));
+        localStorage.removeItem('pave_admin_logged_out');
         return { success: true };
       }
       return { success: false, error: response.error || 'Login failed' };
@@ -58,6 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setAdmin(null);
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.setItem('pave_admin_logged_out', 'true');
       setIsLoading(false);
     }
   }, []);
@@ -75,12 +79,4 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 }

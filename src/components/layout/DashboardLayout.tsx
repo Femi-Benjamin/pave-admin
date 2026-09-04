@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -112,7 +112,6 @@ export default function DashboardLayout() {
                 <Link
                   key={item.path}
                   to={item.path}
-                  onClick={() => setSidebarOpen(false)}
                   className={cn("nav-item", isActive && "nav-item-active")}
                 >
                   <Icon className="w-5 h-5" />
