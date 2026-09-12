@@ -2845,7 +2845,9 @@ export function AdminApp({
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [editProductForm, setEditProductForm] = useState<Product | null>(null);
   const [isEditProductSaved, setIsEditProductSaved] = useState(false);
-  const [productModalTab, setProductModalTab] = useState<"edit" | "preview">("edit");
+  const [productModalTab, setProductModalTab] = useState<"edit" | "preview">(
+    "edit",
+  );
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [selectedWalletMember, setSelectedWalletMember] =
     useState<Member | null>(null);
@@ -2964,13 +2966,14 @@ export function AdminApp({
     setSelectedProduct(p);
     setEditProductForm({
       ...p,
-      specs: p.specs && p.specs.length > 0
-        ? [...p.specs]
-        : [
-            "Official 1-Year Warranty",
-            "Express Hub Pickup in Lagos/Abuja",
-            "Eligible for 50% down installment plan",
-          ],
+      specs:
+        p.specs && p.specs.length > 0
+          ? [...p.specs]
+          : [
+              "Official 1-Year Warranty",
+              "Express Hub Pickup in Lagos/Abuja",
+              "Eligible for 50% down installment plan",
+            ],
     });
     setProductModalTab("edit");
     setIsEditProductSaved(false);
@@ -3914,21 +3917,29 @@ export function AdminApp({
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2 pt-2 border-t border-[#3730A3]/10 text-xs">
                       <div>
-                        <span className="text-[#6B7280] block">50% Down Payment:</span>
+                        <span className="text-[#6B7280] block">
+                          50% Down Payment:
+                        </span>
                         <span className="font-bold text-[#7C3AED] text-sm">
                           {fmt(editProductForm.price * 0.5)}
                         </span>
                       </div>
                       <div>
-                        <span className="text-[#6B7280] block">3-Month Plan:</span>
+                        <span className="text-[#6B7280] block">
+                          3-Month Plan:
+                        </span>
                         <span className="font-bold text-[#0D0F1C] dark:text-white text-sm">
-                          {fmt(Math.round((editProductForm.price * 0.5) / 3))}/mo
+                          {fmt(Math.round((editProductForm.price * 0.5) / 3))}
+                          /mo
                         </span>
                       </div>
                       <div>
-                        <span className="text-[#6B7280] block">6-Month Plan:</span>
+                        <span className="text-[#6B7280] block">
+                          6-Month Plan:
+                        </span>
                         <span className="font-bold text-[#0D0F1C] dark:text-white text-sm">
-                          {fmt(Math.round((editProductForm.price * 0.5) / 6))}/mo
+                          {fmt(Math.round((editProductForm.price * 0.5) / 6))}
+                          /mo
                         </span>
                       </div>
                     </div>
@@ -3981,13 +3992,17 @@ export function AdminApp({
                       />
                       <div className="grid grid-cols-2 gap-3 mt-4">
                         <div className="bg-[#F9FAFB] dark:bg-white/5 p-3 rounded-xl text-center">
-                          <div className="text-xs text-[#9CA3AF]">Stock Level</div>
+                          <div className="text-xs text-[#9CA3AF]">
+                            Stock Level
+                          </div>
                           <div className="text-lg font-bold text-[#0D0F1C] dark:text-[#F0F2FF] mt-0.5">
                             {editProductForm.stock} units
                           </div>
                         </div>
                         <div className="bg-[#F9FAFB] dark:bg-white/5 p-3 rounded-xl text-center">
-                          <div className="text-xs text-[#9CA3AF]">Total Sales</div>
+                          <div className="text-xs text-[#9CA3AF]">
+                            Total Sales
+                          </div>
                           <div className="text-lg font-bold text-[#059669] mt-0.5">
                             {editProductForm.sales} sold
                           </div>
@@ -4034,7 +4049,8 @@ export function AdminApp({
                             3-Month Monthly:
                           </span>
                           <span className="font-semibold text-[#0D0F1C] dark:text-white">
-                            {fmt(Math.round((editProductForm.price * 0.5) / 3))}/mo
+                            {fmt(Math.round((editProductForm.price * 0.5) / 3))}
+                            /mo
                           </span>
                         </div>
                         <div className="mt-1 text-xs flex justify-between">
@@ -4042,7 +4058,8 @@ export function AdminApp({
                             6-Month Monthly:
                           </span>
                           <span className="font-semibold text-[#0D0F1C] dark:text-white">
-                            {fmt(Math.round((editProductForm.price * 0.5) / 6))}/mo
+                            {fmt(Math.round((editProductForm.price * 0.5) / 6))}
+                            /mo
                           </span>
                         </div>
                       </div>
