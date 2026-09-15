@@ -44,6 +44,7 @@ import {
   CreditCard,
   Building,
   AlertTriangle,
+  Sparkles,
 } from "lucide-react";
 import {
   AreaChart,
@@ -63,6 +64,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
+import { ShopProductForm } from "./ShopProductForm";
 import { useAuth } from "@/hooks/useAuth";
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
@@ -1895,6 +1897,13 @@ function MarketplaceSection({
   onDeleteProduct: (p: Product) => void;
   onSelectProduct: (p: Product) => void;
 }) {
+  const [uiMode, setUiMode] = useState<"classic" | "coop">(() => {
+    return (
+      (localStorage.getItem("pave_marketplace_add_ui_mode") as
+        | "classic"
+        | "coop") || "coop"
+    );
+  });
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -1902,6 +1911,12 @@ function MarketplaceSection({
     price: "",
     stock: "",
   });
+
+  const handleSelectUiMode = (mode: "classic" | "coop") => {
+    setUiMode(mode);
+    localStorage.setItem("pave_marketplace_add_ui_mode", mode);
+    setShowForm(true);
+  };
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1932,41 +1947,106 @@ function MarketplaceSection({
         title="Marketplace"
         subtitle="Manage products and installment listings"
         action={
-          <button
-            onClick={() => setShowForm(true)}
-            className="px-4 py-2 bg-[#3730A3] hover:bg-[#312E81] text-white rounded-xl text-sm font-medium flex items-center gap-2 transition-colors shadow-sm"
-          >
-            <Plus size={16} />
-            Add Product
-          </button>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {/* UI Mode Selector - without 'Add UI:' label */}
+            <div className="bg-[#F1F3FB] dark:bg-white/5 p-1 rounded-xl flex items-center gap-1 border border-[#E5E7EB] dark:border-white/10 text-xs">
+              <button
+                type="button"
+                onClick={() => handleSelectUiMode("classic")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  uiMode === "classic"
+                    ? "bg-white dark:bg-[#3730A3] text-[#3730A3] dark:text-white shadow-sm font-semibold"
+                    : "text-[#6B7280] dark:text-[#94A3B8] hover:text-[#0D0F1C] dark:hover:text-white"
+                }`}
+                title="Use Classic Add Product form"
+              >
+                Classic Form
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectUiMode("coop")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all ${
+                  uiMode === "coop"
+                    ? "bg-[#3730A3] text-white shadow-sm font-semibold"
+                    : "text-[#6B7280] dark:text-[#94A3B8] hover:text-[#0D0F1C] dark:hover:text-white"
+                }`}
+                title="Use new Shop Product form"
+              >
+                <Sparkles
+                  size={12}
+                  className={uiMode === "coop" ? "text-amber-300" : ""}
+                />
+                Shop Product (New)
+              </button>
+            </div>
+
+            <button
+              onClick={() => setShowForm(!showForm)}
+              className="px-4 py-2 bg-[#3730A3] hover:bg-[#312E81] text-white rounded-xl text-sm font-medium flex items-center gap-2 transition-colors shadow-sm"
+            >
+              <Plus size={16} />
+              Add Product
+            </button>
+          </div>
         }
       />
 
-      <AnimatePresence>
-        {showForm && (
-          <motion.form
-            onSubmit={handleAdd}
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="bg-white dark:bg-[#111327] rounded-2xl p-6 border border-[#F1F3FB] dark:border-white/10 mb-5 shadow-md"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3
-                style={{
-                  fontFamily:
-                    "var(--font-family-display, 'Bricolage Grotesque')",
-                  fontWeight: 700,
-                  fontSize: 16,
-                }}
-                className="text-[#0D0F1C] dark:text-[#F0F2FF]"
-              >
-                Add New Product
-              </h3>
-              <button type="button" onClick={() => setShowForm(false)}>
-                <X size={18} className="text-[#9CA3AF]" />
-              </button>
-            </div>
+      <AnimatePresence mode="wait">
+        {showForm &&
+          (uiMode === "coop" ? (
+            <ShopProductForm
+              key="shop-product-form"
+              onAddProduct={onAddProduct}
+              onClose={() => setShowForm(false)}
+              onSwitchToClassic={() => {
+                setUiMode("classic");
+                localStorage.setItem("pave_marketplace_add_ui_mode", "classic");
+              }}
+            />
+          ) : (
+            <motion.form
+              key="classic-product-form"
+              onSubmit={handleAdd}
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="bg-white dark:bg-[#111327] rounded-2xl p-6 border border-[#F1F3FB] dark:border-white/10 mb-5 shadow-md"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <h3
+                    style={{
+                      fontFamily:
+                        "var(--font-family-display, 'Bricolage Grotesque')",
+                      fontWeight: 700,
+                      fontSize: 16,
+                    }}
+                    className="text-[#0D0F1C] dark:text-[#F0F2FF]"
+                  >
+                    Add New Product (Classic UI)
+                  </h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUiMode("coop");
+                      localStorage.setItem(
+                        "pave_marketplace_add_ui_mode",
+                        "coop"
+                      );
+                    }}
+                    className="px-2.5 py-1 bg-[#EEF2FF] dark:bg-white/10 hover:bg-[#E0E7FF] text-[#3730A3] dark:text-[#818CF8] rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
+                    title="Switch to the new Shop Product form"
+                  >
+                    <Sparkles size={12} />
+                    Switch to Shop Product (New)
+                  </button>
+                  <button type="button" onClick={() => setShowForm(false)}>
+                    <X size={18} className="text-[#9CA3AF]" />
+                  </button>
+                </div>
+              </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div className="sm:col-span-2">
                 <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
@@ -2051,7 +2131,7 @@ function MarketplaceSection({
               </button>
             </div>
           </motion.form>
-        )}
+        ))}
       </AnimatePresence>
 
       <div className="bg-white dark:bg-[#111327] rounded-2xl border border-[#F1F3FB] dark:border-white/10 overflow-hidden shadow-sm">
