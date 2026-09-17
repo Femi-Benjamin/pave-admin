@@ -66,6 +66,7 @@ import {
 import { ImageWithFallback } from "../figma/ImageWithFallback";
 import { ShopProductForm } from "./ShopProductForm";
 import { useAuth } from "@/hooks/useAuth";
+import { FullScreenChat } from "./FullScreenChat";
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 export type AdminSection =
@@ -2419,69 +2420,13 @@ function MessagingSection() {
         )}
       </div>
 
-      {/* Chat Thread Dialog */}
+      {/* Full Screen Chat */}
       <AnimatePresence>
         {activeChat && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.95 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.95 }}
-              className="bg-white dark:bg-[#111327] rounded-2xl w-full max-w-md shadow-2xl border border-white/10 overflow-hidden flex flex-col h-[500px]"
-            >
-              <div className="p-4 border-b border-[#F1F3FB] dark:border-white/10 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-[#EEF2FF] text-[#3730A3] font-bold flex items-center justify-center">
-                    {activeChat.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")}
-                  </div>
-                  <div>
-                    <div className="font-bold text-sm text-[#0D0F1C] dark:text-[#F0F2FF]">
-                      {activeChat.name}
-                    </div>
-                    <div className="text-xs text-emerald-600 font-medium">
-                      Online
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setActiveChat(null)}
-                  className="text-[#9CA3AF] hover:text-foreground"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-              <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#F9FAFB] dark:bg-white/5">
-                <div className="flex justify-start">
-                  <div className="bg-white dark:bg-[#1E2140] p-3 rounded-2xl rounded-tl-none shadow-sm text-sm text-[#0D0F1C] dark:text-[#F0F2FF] max-w-[80%]">
-                    {activeChat.lastMsg}
-                  </div>
-                </div>
-                <div className="flex justify-end">
-                  <div className="bg-[#3730A3] text-white p-3 rounded-2xl rounded-tr-none text-sm max-w-[80%]">
-                    Hello! We have received your query and our operations team
-                    is attending to it.
-                  </div>
-                </div>
-              </div>
-              <div className="p-3 border-t border-[#F1F3FB] dark:border-white/10 flex items-center gap-2">
-                <input
-                  placeholder="Type a message..."
-                  className="flex-1 bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-2 text-sm outline-none text-[#0D0F1C] dark:text-[#F0F2FF]"
-                />
-                <button className="w-9 h-9 rounded-xl bg-[#3730A3] text-white flex items-center justify-center hover:bg-[#312E81]">
-                  <Send size={15} />
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
+          <FullScreenChat
+            conversation={activeChat}
+            onClose={() => setActiveChat(null)}
+          />
         )}
       </AnimatePresence>
     </div>
