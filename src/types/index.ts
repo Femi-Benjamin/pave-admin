@@ -7,9 +7,45 @@ export interface AdminUser {
   name: string;
   email: string;
   role: AdminRole;
+  token?: string;
   avatar?: string;
   createdAt: string;
   lastLoginAt?: string;
+}
+
+export interface CreateAdminAccountInput {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+  address: string;
+  city: string;
+  state: string;
+  role?: 'admin' | 'superadmin';
+}
+
+export interface CreateAdminAccountResponse {
+  message: string;
+  user: Record<string, unknown>;
+}
+
+export interface AdminPendingKycUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber?: string;
+  nin?: string | null;
+  kycDocumentType?: string | null;
+  isKycVerified: boolean;
+  kycStatus: KYCStatus;
+  createdAt: string;
+}
+
+export interface AdminKycApprovalResponse {
+  id: string;
+  isKycVerified: boolean;
+  kycStatus: KYCStatus;
 }
 
 export type KYCStatus = 'pending' | 'approved' | 'rejected';

@@ -17,6 +17,10 @@ import {
   UserFilters,
   TransactionFilters,
   KYCStatus,
+  CreateAdminAccountInput,
+  CreateAdminAccountResponse,
+  AdminPendingKycUser,
+  AdminKycApprovalResponse,
 } from '@/types';
 
 import {
@@ -42,6 +46,27 @@ const simulateDelay = (ms: number = 500): Promise<void> => {
   return new Promise(resolve => setTimeout(resolve, ms));
 };
 
+const getStoredToken = (): string | undefined => {
+  const token = localStorage.getItem('pave_admin_token');
+  if (token) return token;
+
+  const storedAuth = localStorage.getItem('pave_admin_auth');
+  if (!storedAuth) return undefined;
+
+  try {
+    const parsed = JSON.parse(storedAuth) as { token?: unknown };
+    return typeof parsed.token === 'string' ? parsed.token : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const getResponseMessage = (value: unknown, fallback: string): string =>
+  isRecord(value) && typeof value.message === 'string' ? value.message : fallback;
+
 // Generic API fetch wrapper
 async function apiFetch<T>(
   endpoint: string,
@@ -53,24 +78,41 @@ async function apiFetch<T>(
   }
 
   try {
+    const token = getStoredToken();
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options?.headers,
       },
       ...options,
     });
 
-    const data = await response.json();
+    const contentType = response.headers.get('content-type') || '';
+    const data: unknown = contentType.includes('application/json')
+      ? await response.json()
+      : undefined;
 
     if (!response.ok) {
       return {
         success: false,
-        error: data.message || 'An error occurred',
+        error: getResponseMessage(data, `Request failed (${response.status})`),
       };
     }
 
-    return { success: true, data };
+    if (isRecord(data) && data.success === false) {
+      return { success: false, error: getResponseMessage(data, 'Request failed') };
+    }
+
+    if (isRecord(data) && 'data' in data) {
+      return {
+        success: true,
+        data: data.data as T,
+        message: getResponseMessage(data, ''),
+      };
+    }
+
+    return { success: true, data: data as T, message: getResponseMessage(data, '') };
   } catch (error) {
     return {
       success: false,
@@ -90,10 +132,59 @@ export const authService = {
       }
       return { success: false, error: 'Invalid email or password' };
     }
-    return apiFetch('/api/auth/login', {
+    const response = await apiFetch<Record<string, unknown>>('/api/v1/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
+
+    if (!response.success || !response.data) {
+      return { success: false, error: response.error || 'Login failed' };
+    }
+
+    const payload = response.data;
+    const user = isRecord(payload.user) ? payload.user : payload;
+    const id = typeof user.id === 'string' ? user.id : user._id;
+    const firstName = typeof user.firstName === 'string' ? user.firstName : '';
+    const lastName = typeof user.lastName === 'string' ? user.lastName : '';
+    const name =
+      typeof user.name === 'string'
+        ? user.name
+        : `${firstName} ${lastName}`.trim();
+    const role =
+      user.role === 'superadmin' ? 'super_admin' : user.role;
+
+    if (
+      typeof id !== 'string' ||
+      typeof user.email !== 'string' ||
+      typeof role !== 'string' ||
+      (role !== 'admin' && role !== 'super_admin')
+    ) {
+      return {
+        success: false,
+        error: 'The login response did not contain a valid admin account.',
+      };
+    }
+
+    const token =
+      typeof payload.token === 'string'
+        ? payload.token
+        : typeof payload.accessToken === 'string'
+          ? payload.accessToken
+          : undefined;
+
+    return {
+      success: true,
+      data: {
+        id,
+        name,
+        email: user.email,
+        role,
+        createdAt:
+          typeof user.createdAt === 'string' ? user.createdAt : new Date().toISOString(),
+        ...(token ? { token } : {}),
+      },
+      message: response.message,
+    };
   },
 
   async forgotPassword(email: string): Promise<ApiResponse<{ message: string }>> {
@@ -117,6 +208,78 @@ export const authService = {
       return { success: true };
     }
     return apiFetch('/api/auth/logout', { method: 'POST' });
+  },
+};
+
+// Admin Service
+export const adminService = {
+  async createAdminAccount(
+    input: CreateAdminAccountInput
+  ): Promise<ApiResponse<CreateAdminAccountResponse>> {
+    return apiFetch<CreateAdminAccountResponse>('/api/v1/admin/adminRegister', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  async getPendingKyc(): Promise<ApiResponse<AdminPendingKycUser[]>> {
+    if (USE_MOCK_DATA) {
+      await simulateDelay(500);
+      const data = mockKYCSubmissions
+        .filter(submission => submission.status === 'pending')
+        .map(submission => {
+          const user = mockUsers.find(candidate => candidate.id === submission.userId);
+          if (!user) {
+            throw new Error(`Mock user ${submission.userId} for pending KYC was not found`);
+          }
+
+          const [firstName, ...lastNameParts] = user.fullName.split(' ');
+          return {
+            id: user.id,
+            firstName,
+            lastName: lastNameParts.join(' '),
+            email: user.email,
+            phoneNumber: user.phone,
+            nin: submission.nin,
+            isKycVerified: false,
+            kycStatus: 'pending' as const,
+            createdAt: submission.submittedAt,
+          };
+        });
+
+      return { success: true, data };
+    }
+
+    return apiFetch<AdminPendingKycUser[]>('/api/v1/admin/getAllPendingKyc');
+  },
+
+  async approveKyc(userId: string): Promise<ApiResponse<AdminKycApprovalResponse>> {
+    if (USE_MOCK_DATA) {
+      await simulateDelay(600);
+      const submission = mockKYCSubmissions.find(
+        item => item.userId === userId && item.status === 'pending',
+      );
+      const user = mockUsers.find(item => item.id === userId);
+
+      if (!submission || !user) {
+        return { success: false, error: 'Pending KYC submission not found' };
+      }
+
+      submission.status = 'approved';
+      submission.reviewedAt = new Date().toISOString();
+      user.kycStatus = 'approved';
+      user.walletEnabled = true;
+
+      return {
+        success: true,
+        data: { id: user.id, isKycVerified: true, kycStatus: 'approved' },
+      };
+    }
+
+    return apiFetch<AdminKycApprovalResponse>(
+      `/api/v1/admin/adminApprovedKyc/${encodeURIComponent(userId)}`,
+      { method: 'PUT' },
+    );
   },
 };
 

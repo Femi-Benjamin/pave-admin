@@ -67,6 +67,13 @@ import { ImageWithFallback } from "../figma/ImageWithFallback";
 import { ShopProductForm } from "./ShopProductForm";
 import { useAuth } from "@/hooks/useAuth";
 import { FullScreenChat } from "./FullScreenChat";
+import {
+  useApproveAdminKyc,
+  useCreateAdminAccount,
+  usePendingAdminKyc,
+} from "@/hooks/useAdmin";
+import { toast } from "@/components/ui/sonner";
+import type { AdminPendingKycUser } from "@/types";
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 export type AdminSection =
@@ -110,6 +117,20 @@ export interface KYCItem {
   nin: string;
   idType: string;
   status: "pending" | "reviewing" | "approved" | "rejected";
+}
+
+function mapPendingKycUser(user: AdminPendingKycUser): KYCItem {
+  const name = `${user.firstName} ${user.lastName}`.trim();
+
+  return {
+    id: user.id,
+    name: name || user.email,
+    email: user.email,
+    submitted: new Date(user.createdAt).toLocaleDateString(),
+    nin: user.nin || "Not provided",
+    idType: user.kycDocumentType || (user.nin ? "NIN" : "Not provided"),
+    status: "pending",
+  };
 }
 
 export interface SavingsProgram {
@@ -256,36 +277,6 @@ const INITIAL_MEMBERS: Member[] = [
     accountNumber: "9928374615",
     bankName: "PAVE Virtual Bank / Providus",
     tier: "Tier 1 - Unverified",
-  },
-];
-
-const INITIAL_KYC_QUEUE: KYCItem[] = [
-  {
-    id: "1",
-    name: "Chinwe Okonkwo",
-    email: "chinwe@email.com",
-    submitted: "Jun 13, 2024",
-    nin: "12345678901",
-    idType: "PVC",
-    status: "pending",
-  },
-  {
-    id: "2",
-    name: "Amaka Eze",
-    email: "amaka@email.com",
-    submitted: "Jun 14, 2024",
-    nin: "98765432100",
-    idType: "Passport",
-    status: "pending",
-  },
-  {
-    id: "3",
-    name: "Babatunde Lawson",
-    email: "babatunde@email.com",
-    submitted: "Jun 12, 2024",
-    nin: "11122334455",
-    idType: "NIN Card",
-    status: "reviewing",
   },
 ];
 
@@ -1246,10 +1237,16 @@ function KYCSection({
   queue,
   onApprove,
   onReject,
+  isLoading,
+  loadError,
+  onRetry,
 }: {
   queue: KYCItem[];
   onApprove: (id: string) => void;
   onReject: (id: string, reason: string) => void;
+  isLoading: boolean;
+  loadError: string | null;
+  onRetry: () => void;
 }) {
   const [action, setAction] = useState<{
     id: string;
@@ -1275,7 +1272,21 @@ function KYCSection({
         title="KYC Review"
         subtitle={`${queue.length} pending reviews`}
       />
-      {queue.length === 0 ? (
+      {isLoading ? (
+        <div className="rounded-2xl border border-[#F1F3FB] bg-white p-8 text-center text-sm text-[#9CA3AF] shadow-sm dark:border-white/10 dark:bg-[#111327]">
+          Loading pending KYC submissions...
+        </div>
+      ) : loadError ? (
+        <div className="rounded-2xl border border-red-200 bg-white p-8 text-center shadow-sm dark:border-red-900 dark:bg-[#111327]">
+          <p className="mb-4 text-sm text-red-600 dark:text-red-400">{loadError}</p>
+          <button
+            onClick={onRetry}
+            className="rounded-xl bg-[#3730A3] px-4 py-2 text-sm font-semibold text-white hover:bg-[#312E81]"
+          >
+            Retry
+          </button>
+        </div>
+      ) : queue.length === 0 ? (
         <div className="bg-white dark:bg-[#111327] rounded-2xl p-16 border border-[#F1F3FB] dark:border-white/10 flex flex-col items-center gap-4 text-center shadow-sm">
           <CheckCircle size={48} className="text-[#059669]" />
           <h3
@@ -2590,13 +2601,61 @@ function ReportsSection() {
 
 // ─── Settings Section ─────────────────────────────────────────────────────────
 function SettingsSection() {
+  const { admin } = useAuth();
+  const canManageAdmins = admin?.role === "super_admin";
   const [emailNotif, setEmailNotif] = useState(true);
   const [smsNotif, setSmsNotif] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [adminForm, setAdminForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phoneNumber: "",
+    address: "",
+    city: "",
+    state: "",
+    role: "admin" as "admin" | "superadmin",
+  });
+  const createAdminAccount = useCreateAdminAccount();
 
   const handleSave = () => {
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
+  };
+
+  const handleAdminFormChange = (
+    event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
+    const { name, value } = event.target;
+    setAdminForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleCreateAdmin = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!canManageAdmins) {
+      toast.error("Only super administrators can create admin accounts.");
+      return;
+    }
+
+    try {
+      await createAdminAccount.mutateAsync(adminForm);
+      toast.success("Admin account created successfully");
+      setAdminForm({
+        firstName: "",
+        lastName: "",
+        email: "",
+        phoneNumber: "",
+        address: "",
+        city: "",
+        state: "",
+        role: "admin",
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Unable to create admin account",
+      );
+    }
   };
 
   const notificationToggles: Array<{
@@ -2670,6 +2729,70 @@ function SettingsSection() {
           </div>
         </div>
         <div className="flex flex-col gap-4">
+          {canManageAdmins && <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
+            <h3
+              style={{
+                fontFamily: "var(--font-family-display, 'Bricolage Grotesque')",
+                fontWeight: 700,
+                fontSize: 16,
+              }}
+              className="mb-1 text-[#0D0F1C] dark:text-[#F0F2FF]"
+            >
+              Create Admin Account
+            </h3>
+            <p className="mb-4 text-sm text-[#9CA3AF]">
+              Add an administrator to the Pave platform.
+            </p>
+            <form onSubmit={handleCreateAdmin} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {[
+                ["firstName", "First name"],
+                ["lastName", "Last name"],
+                ["email", "Email address"],
+                ["phoneNumber", "Phone number"],
+                ["address", "Address"],
+                ["city", "City"],
+                ["state", "State"],
+              ].map(([name, label]) => (
+                <label
+                  key={name}
+                  className={name === "address" ? "sm:col-span-2" : ""}
+                >
+                  <span className="mb-1 block text-xs font-medium text-[#374151] dark:text-gray-300">
+                    {label}
+                  </span>
+                  <input
+                    name={name}
+                    type={name === "email" ? "email" : "text"}
+                    value={adminForm[name as keyof typeof adminForm]}
+                    onChange={handleAdminFormChange}
+                    required
+                    className="w-full rounded-xl border border-transparent bg-[#F1F3FB] px-4 py-3 text-sm text-[#0D0F1C] outline-none focus:border-[#3730A3] dark:bg-white/5 dark:text-[#F0F2FF]"
+                  />
+                </label>
+              ))}
+              <label>
+                <span className="mb-1 block text-xs font-medium text-[#374151] dark:text-gray-300">
+                  Role
+                </span>
+                <select
+                  name="role"
+                  value={adminForm.role}
+                  onChange={handleAdminFormChange}
+                  className="w-full rounded-xl border border-transparent bg-[#F1F3FB] px-4 py-3 text-sm text-[#0D0F1C] outline-none focus:border-[#3730A3] dark:bg-white/5 dark:text-[#F0F2FF]"
+                >
+                  <option value="admin">Admin</option>
+                  <option value="superadmin">Super Admin</option>
+                </select>
+              </label>
+              <button
+                type="submit"
+                disabled={createAdminAccount.isPending}
+                className="mt-2 flex items-center justify-center gap-2 rounded-xl bg-[#3730A3] py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#312E81] disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2"
+              >
+                {createAdminAccount.isPending ? "Creating account..." : "Create Admin Account"}
+              </button>
+            </form>
+          </div>}
           <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
             <h3
               style={{
@@ -2795,6 +2918,7 @@ export function AdminApp({
   const navigate = useNavigate();
   const location = useLocation();
   const { logout } = useAuth();
+  const approveKycMutation = useApproveAdminKyc();
 
   // Dark mode state
   const [internalIsDark, setInternalIsDark] = useState(() => {
@@ -2847,6 +2971,9 @@ export function AdminApp({
   const [section, setSection] = useState<AdminSection>(() =>
     getSectionFromPath(location.pathname),
   );
+  const pendingKycQuery = usePendingAdminKyc(
+    section === "kyc" || section === "kyc-detail",
+  );
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window !== "undefined") {
       return window.innerWidth >= 768;
@@ -2857,7 +2984,7 @@ export function AdminApp({
   const [selectedMember, setSelectedMember] = useState<Member>(
     INITIAL_MEMBERS[0],
   );
-  const [kycQueue, setKycQueue] = useState<KYCItem[]>(INITIAL_KYC_QUEUE);
+  const [kycQueue, setKycQueue] = useState<KYCItem[]>([]);
   const [savingsPrograms, setSavingsPrograms] = useState<SavingsProgram[]>(
     INITIAL_SAVINGS_PROGRAMS,
   );
@@ -2865,6 +2992,12 @@ export function AdminApp({
   const [notifications, setNotifications] = useState<NotificationItem[]>(
     INITIAL_NOTIFICATIONS,
   );
+
+  useEffect(() => {
+    if (pendingKycQuery.data) {
+      setKycQueue(pendingKycQuery.data.map(mapPendingKycUser));
+    }
+  }, [pendingKycQuery.data]);
 
   // Modals & Interactive View States
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -2961,15 +3094,26 @@ export function AdminApp({
     searchResults.programs.length > 0;
 
   // Action handlers
-  const handleApproveKYC = (id: string) => {
-    setKycQueue((prev) => prev.filter((k) => k.id !== id));
-    setMembers((prev) =>
-      prev.map((m) =>
-        m.id === id
-          ? { ...m, kyc: "approved" as const, status: "active" as const }
-          : m,
-      ),
-    );
+  const handleApproveKYC = async (id: string) => {
+    const pendingUser = kycQueue.find((kyc) => kyc.id === id);
+    if (!pendingUser) return;
+
+    try {
+      await approveKycMutation.mutateAsync(pendingUser.id);
+      setKycQueue((prev) => prev.filter((kyc) => kyc.id !== id));
+      setMembers((prev) =>
+        prev.map((member) =>
+          member.email === pendingUser.email
+            ? { ...member, kyc: "approved" as const, status: "active" as const }
+            : member,
+        ),
+      );
+      toast.success("KYC approved successfully");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Unable to approve KYC",
+      );
+    }
   };
 
   const handleRejectKYC = (id: string, _reason: string) => {
@@ -3123,6 +3267,17 @@ export function AdminApp({
             queue={kycQueue}
             onApprove={handleApproveKYC}
             onReject={handleRejectKYC}
+            isLoading={pendingKycQuery.isLoading}
+            loadError={
+              pendingKycQuery.error instanceof Error
+                ? pendingKycQuery.error.message
+                : pendingKycQuery.isError
+                  ? "Unable to load pending KYC submissions"
+                  : null
+            }
+            onRetry={() => {
+              void pendingKycQuery.refetch();
+            }}
           />
         );
       case "savings-programs":

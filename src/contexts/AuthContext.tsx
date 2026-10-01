@@ -12,7 +12,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Check for existing session on mount
   useEffect(() => {
     const storedAuth = localStorage.getItem(STORAGE_KEY);
-    const hasLoggedOut = localStorage.getItem('pave_admin_logged_out');
     if (storedAuth) {
       try {
         const parsed = JSON.parse(storedAuth);
@@ -20,18 +19,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {
         localStorage.removeItem(STORAGE_KEY);
       }
-    } else if (!hasLoggedOut) {
-      const defaultAdmin: AdminUser = {
-        id: 'admin_001',
-        name: 'Benjamin Okonkwo',
-        email: 'benjamin@pave.com',
-        role: 'super_admin',
-        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Benjamin',
-        createdAt: '2024-01-15T08:00:00Z',
-        lastLoginAt: new Date().toISOString(),
-      };
-      setAdmin(defaultAdmin);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultAdmin));
     }
     setIsLoading(false);
   }, []);
@@ -43,7 +30,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response.success && response.data) {
         setAdmin(response.data);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(response.data));
-        localStorage.removeItem('pave_admin_logged_out');
+        if (response.data.token) {
+          localStorage.setItem('pave_admin_token', response.data.token);
+        }
         return { success: true };
       }
       return { success: false, error: response.error || 'Login failed' };
@@ -61,7 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setAdmin(null);
       localStorage.removeItem(STORAGE_KEY);
-      localStorage.setItem('pave_admin_logged_out', 'true');
+      localStorage.removeItem('pave_admin_token');
       setIsLoading(false);
     }
   }, []);
