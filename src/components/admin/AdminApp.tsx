@@ -7,6 +7,7 @@ import {
   Shield,
   PiggyBank,
   Wallet,
+  ArrowLeftRight as TransactionsIcon,
   ShoppingBag,
   MessageSquare,
   BarChart2,
@@ -68,12 +69,23 @@ import { ShopProductForm } from "./ShopProductForm";
 import { useAuth } from "@/hooks/useAuth";
 import { FullScreenChat } from "./FullScreenChat";
 import {
+  useAdminUserDetails,
+  useAdminUserTransactions,
+  useAdminTransactionDetails,
+  useAdminTransactionSearch,
+  useAdminTransactions,
+  useAdminUserRoles,
   useApproveAdminKyc,
+  useBlockAdminUser,
   useCreateAdminAccount,
   usePendingAdminKyc,
 } from "@/hooks/useAdmin";
 import { toast } from "@/components/ui/sonner";
-import type { AdminPendingKycUser } from "@/types";
+import type {
+  AdminPendingKycUser,
+  AdminTransactionUser,
+  AdminUserRole,
+} from "@/types";
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 export type AdminSection =
@@ -85,6 +97,7 @@ export type AdminSection =
   | "savings-programs"
   | "program-detail"
   | "wallets"
+  | "transactions"
   | "marketplace"
   | "product-form"
   | "messaging"
@@ -1897,6 +1910,354 @@ function WalletsSection({
   );
 }
 
+function AdminTransactionsSection() {
+  const [meterNumberInput, setMeterNumberInput] = useState("");
+  const [searchedMeterNumber, setSearchedMeterNumber] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState("all");
+  const [selectedTransactionId, setSelectedTransactionId] = useState<
+    string | undefined
+  >();
+  const transactionsQuery = useAdminTransactions();
+  const searchQuery = useAdminTransactionSearch(searchedMeterNumber);
+  const usersQuery = useAdminUserRoles();
+  const transactionDetailsQuery = useAdminTransactionDetails(
+    selectedTransactionId,
+  );
+  const users = usersQuery.data || [];
+  const userById = new Map(users.map((user) => [user._id, user]));
+  const transactions = transactionsQuery.data?.data || [];
+  const filteredTransactions =
+    selectedUserId === "all"
+      ? transactions
+      : transactions.filter((transaction) => {
+          const transactionUserId =
+            typeof transaction.userId === "string"
+              ? transaction.userId
+              : transaction.userId._id;
+          return transactionUserId === selectedUserId;
+        });
+  const searchedTransactions = searchQuery.data || [];
+
+  const getUser = (
+    transactionUserId: string | AdminTransactionUser,
+  ): AdminTransactionUser | AdminUserRole | undefined => {
+    if (typeof transactionUserId !== "string") {
+      return transactionUserId;
+    }
+
+    return userById.get(transactionUserId);
+  };
+
+  const renderTransactionRow = (
+    transaction: (typeof transactions)[number],
+  ) => {
+    const user = getUser(transaction.userId);
+    const fullName =
+      user && "fullName" in user && typeof user.fullName === "string"
+        ? user.fullName
+        : "";
+    const displayName = user
+      ? fullName ||
+        `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
+        user.email ||
+        "Unknown user"
+      : "Unknown user";
+    const transactionId = transaction._id;
+
+    return (
+      <tr key={transactionId}>
+        <td className="px-4 py-3 text-sm">
+          <div className="font-medium text-[#0D0F1C] dark:text-[#F0F2FF]">
+            {displayName}
+          </div>
+          <div className="text-xs text-[#9CA3AF]">
+            {user?.email || ""}
+          </div>
+        </td>
+        <td className="px-4 py-3 font-mono text-xs">{transaction.reference}</td>
+        <td className="px-4 py-3 text-sm">
+          {transaction.meterNumber || "—"}
+        </td>
+        <td className="px-4 py-3 text-sm font-semibold">
+          {fmt(Number(transaction.amount))}
+        </td>
+        <td className="px-4 py-3 text-sm">{transaction.status}</td>
+        <td className="px-4 py-3 text-xs text-[#6B7280] dark:text-[#94A3B8]">
+          {new Date(transaction.createdAt).toLocaleString()}
+        </td>
+        <td className="px-4 py-3">
+          <button
+            onClick={() => setSelectedTransactionId(transactionId)}
+            className="text-xs font-semibold text-[#3730A3] hover:underline dark:text-[#818CF8]"
+          >
+            View
+          </button>
+        </td>
+      </tr>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Transactions"
+        subtitle="Search and review platform transactions, users, and transaction details"
+      />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard
+          label="Total Transactions"
+          value={
+            transactionsQuery.isLoading
+              ? "..."
+              : String(transactionsQuery.data?.totalTransactions ?? 0)
+          }
+          icon={<TransactionsIcon size={20} />}
+        />
+        <StatCard
+          label="Users"
+          value={usersQuery.isLoading ? "..." : String(users.length)}
+          icon={<Users size={20} />}
+          color="#7C3AED"
+          bg="#F5F3FF"
+        />
+        <StatCard
+          label="Blocked Users"
+          value={
+            usersQuery.isLoading
+              ? "..."
+              : String(users.filter((user) => user.isBlocked).length)
+          }
+          icon={<Shield size={20} />}
+          color="#DC2626"
+          bg="#FEF2F2"
+        />
+      </div>
+
+      <section className="rounded-2xl border border-[#F1F3FB] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111327]">
+        <div className="mb-4">
+          <h2 className="font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
+            Search by meter number
+          </h2>
+          <p className="mt-1 text-xs text-[#9CA3AF]">
+            Search uses the meterNumber parameter from the Admin Search Transactions endpoint.
+          </p>
+        </div>
+        <form
+          className="flex flex-col gap-3 sm:flex-row"
+          onSubmit={(event) => {
+            event.preventDefault();
+            setSearchedMeterNumber(meterNumberInput.trim());
+          }}
+        >
+          <input
+            value={meterNumberInput}
+            onChange={(event) => setMeterNumberInput(event.target.value)}
+            placeholder="Enter meter number"
+            className="min-w-0 flex-1 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-2.5 text-sm outline-none focus:border-[#3730A3] dark:border-white/10 dark:bg-white/5"
+          />
+          <button
+            type="submit"
+            disabled={!meterNumberInput.trim() || searchQuery.isFetching}
+            className="rounded-xl bg-[#3730A3] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#312E81] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {searchQuery.isFetching ? "Searching..." : "Search"}
+          </button>
+          {searchedMeterNumber && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchedMeterNumber("");
+                setMeterNumberInput("");
+              }}
+              className="rounded-xl bg-[#F1F3FB] px-4 py-2.5 text-sm font-semibold text-[#374151] dark:bg-white/10 dark:text-gray-200"
+            >
+              Clear
+            </button>
+          )}
+        </form>
+        {searchQuery.isError && (
+          <p role="alert" className="mt-3 text-sm text-red-600">
+            {searchQuery.error instanceof Error
+              ? searchQuery.error.message
+              : "Unable to search transactions"}
+          </p>
+        )}
+        {searchedMeterNumber && !searchQuery.isLoading && !searchQuery.isError && (
+          <div className="mt-4 overflow-x-auto">
+            <h3 className="mb-2 text-sm font-semibold">
+              Search results ({searchedTransactions.length})
+            </h3>
+            {searchedTransactions.length ? (
+              <table className="w-full min-w-[750px] text-left">
+                <thead className="text-xs uppercase text-[#9CA3AF]">
+                  <tr>
+                    <th className="px-4 py-2">User</th>
+                    <th className="px-4 py-2">Reference</th>
+                    <th className="px-4 py-2">Meter</th>
+                    <th className="px-4 py-2">Amount</th>
+                    <th className="px-4 py-2">Status</th>
+                    <th className="px-4 py-2">Date</th>
+                    <th className="px-4 py-2">Details</th>
+                  </tr>
+                </thead>
+                <tbody>{searchedTransactions.map(renderTransactionRow)}</tbody>
+              </table>
+            ) : (
+              <p className="py-3 text-sm text-[#9CA3AF]">
+                No transactions found for this meter number.
+              </p>
+            )}
+          </div>
+        )}
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-[#F1F3FB] bg-white shadow-sm dark:border-white/10 dark:bg-[#111327]">
+        <div className="flex flex-col justify-between gap-3 border-b border-[#F1F3FB] p-5 dark:border-white/10 sm:flex-row sm:items-center">
+          <div>
+            <h2 className="font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
+              All Transactions
+            </h2>
+            <p className="mt-1 text-xs text-[#9CA3AF]">
+              {transactionsQuery.data?.totalTransactions ?? 0} transactions
+            </p>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-xs text-[#6B7280] dark:text-[#94A3B8]">
+              Filter by user
+            </span>
+            <select
+              value={selectedUserId}
+              onChange={(event) => setSelectedUserId(event.target.value)}
+              className="max-w-[240px] rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-2 text-sm dark:border-white/10 dark:bg-[#1E2140]"
+            >
+              <option value="all">All users</option>
+              {users.map((user) => (
+                <option key={user._id} value={user._id}>
+                  {user.firstName} {user.lastName} ({user.role})
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {transactionsQuery.isLoading ? (
+          <div className="p-5 text-sm text-[#9CA3AF]">
+            Loading all transactions...
+          </div>
+        ) : transactionsQuery.isError ? (
+          <div className="p-5 text-sm text-red-600" role="alert">
+            {transactionsQuery.error instanceof Error
+              ? transactionsQuery.error.message
+              : "Unable to load transactions"}
+            <button
+              onClick={() => void transactionsQuery.refetch()}
+              className="ml-3 font-semibold underline"
+            >
+              Retry
+            </button>
+          </div>
+        ) : filteredTransactions.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[850px] text-left">
+              <thead className="bg-[#F9FAFB] text-xs uppercase text-[#9CA3AF] dark:bg-white/5">
+                <tr>
+                  <th className="px-4 py-3">User</th>
+                  <th className="px-4 py-3">Reference</th>
+                  <th className="px-4 py-3">Meter</th>
+                  <th className="px-4 py-3">Amount</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">Details</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#F1F3FB] dark:divide-white/5">
+                {filteredTransactions.map(renderTransactionRow)}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-8 text-center text-sm text-[#9CA3AF]">
+            No transactions found.
+          </div>
+        )}
+      </section>
+
+      {usersQuery.isError && (
+        <p role="alert" className="text-sm text-red-600">
+          {usersQuery.error instanceof Error
+            ? usersQuery.error.message
+            : "Unable to load user roles"}
+          <button
+            onClick={() => void usersQuery.refetch()}
+            className="ml-3 font-semibold underline"
+          >
+            Retry
+          </button>
+        </p>
+      )}
+
+      {selectedTransactionId && (
+        <section className="rounded-2xl border border-[#F1F3FB] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111327]">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
+              Transaction Details
+            </h2>
+            <button
+              onClick={() => setSelectedTransactionId(undefined)}
+              className="text-sm font-semibold text-[#6B7280] hover:text-[#0D0F1C] dark:text-gray-300"
+            >
+              Close
+            </button>
+          </div>
+          {transactionDetailsQuery.isLoading ? (
+            <p className="text-sm text-[#9CA3AF]">Loading transaction details...</p>
+          ) : transactionDetailsQuery.isError ? (
+            <div role="alert" className="text-sm text-red-600">
+              {transactionDetailsQuery.error instanceof Error
+                ? transactionDetailsQuery.error.message
+                : "Unable to load transaction details"}
+              <button
+                onClick={() => void transactionDetailsQuery.refetch()}
+                className="ml-3 font-semibold underline"
+              >
+                Retry
+              </button>
+            </div>
+          ) : transactionDetailsQuery.data ? (
+            <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+              {[
+                ["ID", transactionDetailsQuery.data._id],
+                ["Reference", transactionDetailsQuery.data.reference],
+                ["Amount", fmt(Number(transactionDetailsQuery.data.amount))],
+                ["Status", transactionDetailsQuery.data.status],
+                ["Meter number", transactionDetailsQuery.data.meterNumber || "—"],
+                ["Description", transactionDetailsQuery.data.description || "—"],
+                ["Created", new Date(transactionDetailsQuery.data.createdAt).toLocaleString()],
+                [
+                  "User",
+                  typeof transactionDetailsQuery.data.userId === "string"
+                    ? userById.get(transactionDetailsQuery.data.userId)?.email ||
+                      transactionDetailsQuery.data.userId
+                    : transactionDetailsQuery.data.userId.email ||
+                      transactionDetailsQuery.data.userId._id,
+                ],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl bg-[#F9FAFB] p-3 dark:bg-white/5">
+                  <dt className="text-xs text-[#9CA3AF]">{label}</dt>
+                  <dd className="mt-1 break-all font-medium text-[#374151] dark:text-gray-200">
+                    {value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
+        </section>
+      )}
+    </div>
+  );
+}
+
 // ─── Marketplace Section with Detailed Product Modal ─────────────────────────
 function MarketplaceSection({
   products,
@@ -2882,6 +3243,12 @@ const NAV_ITEMS = [
     path: "/dashboard/wallets",
   },
   {
+    id: "transactions",
+    icon: TransactionsIcon,
+    label: "Transactions",
+    path: "/dashboard/transactions",
+  },
+  {
     id: "marketplace",
     icon: ShoppingBag,
     label: "Marketplace",
@@ -2918,7 +3285,6 @@ export function AdminApp({
   const navigate = useNavigate();
   const location = useLocation();
   const { logout } = useAuth();
-  const approveKycMutation = useApproveAdminKyc();
 
   // Dark mode state
   const [internalIsDark, setInternalIsDark] = useState(() => {
@@ -2960,6 +3326,7 @@ export function AdminApp({
     if (path.includes("/kyc")) return "kyc";
     if (path.includes("/savings")) return "savings-programs";
     if (path.includes("/wallets")) return "wallets";
+    if (path.includes("/transactions")) return "transactions";
     if (path.includes("/marketplace")) return "marketplace";
     if (path.includes("/messaging")) return "messaging";
     if (path.includes("/reports")) return "reports";
@@ -3009,6 +3376,16 @@ export function AdminApp({
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [selectedWalletMember, setSelectedWalletMember] =
     useState<Member | null>(null);
+  const approveKycMutation = useApproveAdminKyc();
+  const userDetailsQuery = useAdminUserDetails(
+    selectedWalletMember?.email,
+    !!selectedWalletMember,
+  );
+  const userTransactionsQuery = useAdminUserTransactions(
+    selectedWalletMember?.email,
+    !!selectedWalletMember,
+  );
+  const blockUserMutation = useBlockAdminUser();
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showNotificationDropdown, setShowNotificationDropdown] =
     useState(false);
@@ -3112,6 +3489,36 @@ export function AdminApp({
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Unable to approve KYC",
+      );
+    }
+  };
+
+  const handleBlockUser = async () => {
+    if (!selectedWalletMember) return;
+
+    try {
+      const result = await blockUserMutation.mutateAsync(
+        selectedWalletMember.email,
+      );
+      setMembers((prev) =>
+        prev.map((member) =>
+          member.email === result.email
+            ? {
+                ...member,
+                status: result.isBlocked ? "suspended" : "active",
+              }
+            : member,
+        ),
+      );
+      setSelectedWalletMember((current) =>
+        current?.email === result.email
+          ? { ...current, status: result.isBlocked ? "suspended" : "active" }
+          : current,
+      );
+      toast.success(result.statusMessage || "User status updated");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Unable to block user",
       );
     }
   };
@@ -3295,6 +3702,8 @@ export function AdminApp({
             onSelectMember={(m) => setSelectedWalletMember(m)}
           />
         );
+      case "transactions":
+        return <AdminTransactionsSection />;
       case "marketplace":
       case "product-form":
         return (
@@ -4417,11 +4826,11 @@ export function AdminApp({
                           "var(--font-family-display, 'Bricolage Grotesque')",
                       }}
                     >
-                      {selectedWalletMember.name}
+                      {userDetailsQuery.data?.fullName || selectedWalletMember.name}
                     </h2>
                     <p className="text-xs text-[#9CA3AF]">
-                      {selectedWalletMember.email} ·{" "}
-                      {selectedWalletMember.phone}
+                      {userDetailsQuery.data?.email || selectedWalletMember.email} ·{" "}
+                      {userDetailsQuery.data?.phone || selectedWalletMember.phone}
                     </p>
                   </div>
                 </div>
@@ -4441,10 +4850,19 @@ export function AdminApp({
                       Virtual NGN Account
                     </span>
                     <div className="text-2xl font-bold tracking-tight font-display mt-0.5">
-                      {fmt(selectedWalletMember.wallet)}
+                      {fmt(userDetailsQuery.data?.balance ?? selectedWalletMember.wallet)}
                     </div>
                   </div>
-                  <Badge color="green">Active Account</Badge>
+                  <Badge
+                    color={
+                      userDetailsQuery.data?.isBlocked ||
+                      userDetailsQuery.data?.status.toLowerCase() === "blocked"
+                        ? "red"
+                        : "green"
+                    }
+                  >
+                    {userDetailsQuery.data?.status || "Loading status..."}
+                  </Badge>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-3 border-t border-white/15 text-xs">
                   <div>
@@ -4452,15 +4870,17 @@ export function AdminApp({
                       Account Number
                     </div>
                     <div className="font-semibold tracking-wider">
-                      {selectedWalletMember.accountNumber || "9928374610"}
+                      {userDetailsQuery.data?.accountNumber ||
+                        selectedWalletMember.accountNumber ||
+                        "Not provided"}
                     </div>
                   </div>
                   <div>
                     <div className="text-white/60 text-[11px]">
-                      Settlement Bank
+                      Account Name
                     </div>
                     <div className="font-semibold truncate">
-                      Providus / PAVE
+                      {userDetailsQuery.data?.accountName || "Not provided"}
                     </div>
                   </div>
                   <div>
@@ -4474,33 +4894,71 @@ export function AdminApp({
                 </div>
               </div>
 
-              {/* Cash Flow Summary */}
-              <div className="grid grid-cols-3 gap-3 mb-6">
-                <div className="bg-[#ECFDF5] dark:bg-[#10B981]/15 p-3.5 rounded-2xl">
-                  <div className="text-xs font-semibold text-[#059669]">
-                    This Month In
+              {userDetailsQuery.isLoading && (
+                <p className="mb-4 text-sm text-[#9CA3AF]">
+                  Loading user details...
+                </p>
+              )}
+              {userDetailsQuery.isError && (
+                <div
+                  role="alert"
+                  className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
+                >
+                  {userDetailsQuery.error instanceof Error
+                    ? userDetailsQuery.error.message
+                    : "Unable to load user details"}
+                  <button
+                    onClick={() => void userDetailsQuery.refetch()}
+                    className="ml-3 font-semibold underline"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+              {userDetailsQuery.data && (
+                <div className="mb-5 grid grid-cols-1 gap-3 rounded-2xl bg-[#F9FAFB] p-4 text-sm dark:bg-white/5 sm:grid-cols-2">
+                  <div>
+                    <div className="text-xs text-[#9CA3AF]">Address</div>
+                    <div className="mt-1 font-medium text-[#374151] dark:text-gray-200">
+                      {userDetailsQuery.data.address || "Not provided"}
+                    </div>
                   </div>
-                  <div className="text-base sm:text-lg font-bold text-[#059669] mt-0.5">
-                    +{fmt(Math.round(selectedWalletMember.wallet * 0.4))}
+                  <div>
+                    <div className="text-xs text-[#9CA3AF]">Signed up</div>
+                    <div className="mt-1 font-medium text-[#374151] dark:text-gray-200">
+                      {new Date(userDetailsQuery.data.signUpOn).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-[#9CA3AF]">Last login</div>
+                    <div className="mt-1 font-medium text-[#374151] dark:text-gray-200">
+                      {userDetailsQuery.data.lastLogin
+                        ? new Date(userDetailsQuery.data.lastLogin).toLocaleString()
+                        : "Not available"}
+                    </div>
                   </div>
                 </div>
-                <div className="bg-[#FEF2F2] dark:bg-[#EF4444]/15 p-3.5 rounded-2xl">
-                  <div className="text-xs font-semibold text-[#DC2626]">
-                    This Month Out
-                  </div>
-                  <div className="text-base sm:text-lg font-bold text-[#DC2626] mt-0.5">
-                    -{fmt(Math.round(selectedWalletMember.wallet * 0.15))}
-                  </div>
+              )}
+              {userDetailsQuery.data && (
+                <div className="mb-5">
+                  {userDetailsQuery.data.isBlocked ||
+                  userDetailsQuery.data.status.toLowerCase() === "blocked" ? (
+                    <div className="rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700 dark:bg-red-950/30 dark:text-red-300">
+                      This user is blocked.
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => void handleBlockUser()}
+                      disabled={blockUserMutation.isPending}
+                      className="rounded-xl bg-[#DC2626] px-4 py-2 text-sm font-semibold text-white hover:bg-[#B91C1C] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {blockUserMutation.isPending
+                        ? "Updating..."
+                        : "Block User"}
+                    </button>
+                  )}
                 </div>
-                <div className="bg-[#FFFBEB] dark:bg-[#FBBF24]/15 p-3.5 rounded-2xl">
-                  <div className="text-xs font-semibold text-[#D97706]">
-                    Total Savings
-                  </div>
-                  <div className="text-base sm:text-lg font-bold text-[#D97706] mt-0.5">
-                    {fmt(selectedWalletMember.savings)}
-                  </div>
-                </div>
-              </div>
+              )}
 
               {/* Transaction Ledger */}
               <div className="mb-6">
@@ -4511,74 +4969,76 @@ export function AdminApp({
                   >
                     Recent Ledger Activity
                   </h3>
-                  <span className="text-xs text-[#9CA3AF]">Last 30 Days</span>
+                  <span className="text-xs text-[#9CA3AF]">
+                    {userTransactionsQuery.data?.length ?? 0} transactions
+                  </span>
                 </div>
                 <div className="space-y-2">
-                  {[
-                    {
-                      id: "tx_1",
-                      type: "credit",
-                      title: "Direct Bank Transfer Inflow",
-                      amount: 50000,
-                      date: "Jun 14, 2024 · 14:22",
-                      ref: "TRX-8930192",
-                    },
-                    {
-                      id: "tx_2",
-                      type: "debit",
-                      title: "Thrift Cycle Contribution",
-                      amount: 25000,
-                      date: "Jun 10, 2024 · 09:15",
-                      ref: "TRX-8829011",
-                    },
-                    {
-                      id: "tx_3",
-                      type: "credit",
-                      title: "Wallet Credit via Paystack",
-                      amount: 100000,
-                      date: "Jun 04, 2024 · 18:40",
-                      ref: "TRX-7718920",
-                    },
-                    {
-                      id: "tx_4",
-                      type: "debit",
-                      title: "Marketplace 50% Down Payment",
-                      amount: 42500,
-                      date: "May 28, 2024 · 11:05",
-                      ref: "TRX-6619022",
-                    },
-                  ].map((tx) => (
+                  {userTransactionsQuery.isLoading ? (
+                    <p className="py-4 text-center text-sm text-[#9CA3AF]">
+                      Loading user transactions...
+                    </p>
+                  ) : userTransactionsQuery.isError ? (
                     <div
-                      key={tx.id}
-                      className="p-3 bg-[#F9FAFB] dark:bg-white/5 rounded-xl flex items-center justify-between text-xs"
+                      role="alert"
+                      className="rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300"
                     >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center ${tx.type === "credit" ? "bg-[#ECFDF5] text-[#059669]" : "bg-[#FEF2F2] text-[#DC2626]"}`}
-                        >
-                          {tx.type === "credit" ? (
-                            <ArrowDownLeft size={16} />
-                          ) : (
-                            <ArrowUpRight size={16} />
-                          )}
-                        </div>
-                        <div>
-                          <div className="font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
-                            {tx.title}
-                          </div>
-                          <div className="text-[10px] text-[#9CA3AF]">
-                            {tx.date} · {tx.ref}
-                          </div>
-                        </div>
-                      </div>
-                      <div
-                        className={`font-bold ${tx.type === "credit" ? "text-[#059669]" : "text-[#DC2626]"}`}
+                      {userTransactionsQuery.error instanceof Error
+                        ? userTransactionsQuery.error.message
+                        : "Unable to load user transactions"}
+                      <button
+                        onClick={() => void userTransactionsQuery.refetch()}
+                        className="ml-3 font-semibold underline"
                       >
-                        {tx.type === "credit" ? "+" : "-"}
-                        {fmt(tx.amount)}
-                      </div>
+                        Retry
+                      </button>
                     </div>
-                  ))}
+                  ) : userTransactionsQuery.data?.length ? (
+                    userTransactionsQuery.data.map((tx) => {
+                      const isCredit =
+                        tx.type?.toLowerCase().includes("credit") ?? false;
+
+                      return (
+                        <div
+                          key={tx._id}
+                          className="flex items-center justify-between rounded-xl bg-[#F9FAFB] p-3 text-xs dark:bg-white/5"
+                        >
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div
+                              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${isCredit ? "bg-[#ECFDF5] text-[#059669]" : "bg-[#FEF2F2] text-[#DC2626]"}`}
+                            >
+                              {isCredit ? (
+                                <ArrowDownLeft size={16} />
+                              ) : (
+                                <ArrowUpRight size={16} />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="truncate font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
+                                {tx.description || tx.type || "Transaction"}
+                              </div>
+                              <div className="truncate text-[10px] text-[#9CA3AF]">
+                                {new Date(tx.createdAt).toLocaleString()} ·{" "}
+                                {tx.reference}
+                              </div>
+                              <div className="text-[10px] text-[#9CA3AF]">
+                                Status: {tx.status}
+                              </div>
+                            </div>
+                          </div>
+                          <div
+                            className={`ml-3 flex-shrink-0 font-bold ${isCredit ? "text-[#059669]" : "text-[#DC2626]"}`}
+                          >
+                            {fmt(tx.amount)}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="py-4 text-center text-sm text-[#9CA3AF]">
+                      No transactions found for this user.
+                    </p>
+                  )}
                 </div>
               </div>
 

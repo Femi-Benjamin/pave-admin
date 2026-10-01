@@ -21,6 +21,12 @@ import {
   CreateAdminAccountResponse,
   AdminPendingKycUser,
   AdminKycApprovalResponse,
+  AdminUserDetails,
+  AdminUserTransaction,
+  AdminBlockUserResponse,
+  AdminTransaction,
+  AdminTransactionsResponse,
+  AdminUserRole,
 } from '@/types';
 
 import {
@@ -279,6 +285,244 @@ export const adminService = {
     return apiFetch<AdminKycApprovalResponse>(
       `/api/v1/admin/adminApprovedKyc/${encodeURIComponent(userId)}`,
       { method: 'PUT' },
+    );
+  },
+
+  async getUserDetails(email: string): Promise<ApiResponse<AdminUserDetails>> {
+    if (USE_MOCK_DATA) {
+      await simulateDelay(400);
+      const user = mockUsers.find(candidate => candidate.email === email);
+      if (!user) {
+        return { success: false, error: 'User details not found' };
+      }
+
+      return {
+        success: true,
+        data: {
+          id: user.id,
+          fullName: user.fullName,
+          email: user.email,
+          phone: user.phone,
+          balance: mockWallets.find(wallet => wallet.userId === user.id)?.balance ?? 0,
+          accountName: null,
+          accountNumber: null,
+          signUpOn: user.createdAt,
+          lastLogin: null,
+          address: null,
+          status: user.walletEnabled ? 'Active' : 'Inactive',
+          isBlocked: false,
+        },
+      };
+    }
+
+    const params = new URLSearchParams({ email });
+    return apiFetch<AdminUserDetails>(
+      `/api/v1/admin/viewUserDetails?${params.toString()}`,
+    );
+  },
+
+  async getUserTransactions(
+    email: string,
+  ): Promise<ApiResponse<AdminUserTransaction[]>> {
+    if (USE_MOCK_DATA) {
+      await simulateDelay(400);
+      const user = mockUsers.find(candidate => candidate.email === email);
+      if (!user) {
+        return { success: false, error: 'User transactions not found' };
+      }
+
+      return {
+        success: true,
+        data: mockTransactions
+          .filter(transaction => transaction.userId === user.id)
+          .map(transaction => ({
+            _id: transaction.id,
+            userId: transaction.userId,
+            amount: transaction.amount,
+            reference: transaction.reference,
+            status: transaction.status,
+            description: transaction.description,
+            type: transaction.type,
+            createdAt: transaction.createdAt,
+          })),
+      };
+    }
+
+    const params = new URLSearchParams({ email });
+    return apiFetch<AdminUserTransaction[]>(
+      `/api/v1/admin/viewUserTransactions?${params.toString()}`,
+    );
+  },
+
+  async blockUser(email: string): Promise<ApiResponse<AdminBlockUserResponse>> {
+    if (USE_MOCK_DATA) {
+      await simulateDelay(500);
+      const user = mockUsers.find(candidate => candidate.email === email);
+      if (!user) {
+        return { success: false, error: 'User not found' };
+      }
+
+      user.walletEnabled = false;
+      return {
+        success: true,
+        data: {
+          id: user.id,
+          fullName: user.fullName,
+          email: user.email,
+          isBlocked: true,
+          statusMessage: 'Blocked',
+        },
+      };
+    }
+
+    const params = new URLSearchParams({ email });
+    return apiFetch<AdminBlockUserResponse>(
+      `/api/v1/admin/blockUser?${params.toString()}`,
+      { method: 'POST' },
+    );
+  },
+
+  async searchTransactionsByMeter(
+    meterNumber: string,
+  ): Promise<ApiResponse<AdminTransaction[]>> {
+    if (USE_MOCK_DATA) {
+      await simulateDelay(400);
+      const needle = meterNumber.trim().toLowerCase();
+      return {
+        success: true,
+        data: mockTransactions
+          .filter(transaction =>
+            `${transaction.reference} ${transaction.description || ''}`.toLowerCase().includes(needle),
+          )
+          .map(transaction => ({
+            _id: transaction.id,
+            userId: transaction.userId,
+            amount: transaction.amount,
+            reference: transaction.reference,
+            status: transaction.status,
+            description: transaction.description,
+            type: transaction.type,
+            createdAt: transaction.createdAt,
+          })),
+      };
+    }
+
+    const params = new URLSearchParams({ meterNumber });
+    const response = await apiFetch<AdminTransaction[] | AdminTransaction>(
+      `/api/v1/admin/searchTransactions?${params.toString()}`,
+    );
+    if (!response.success || !response.data) {
+      return { success: false, error: response.error, message: response.message };
+    }
+
+    return {
+      ...response,
+      data: Array.isArray(response.data) ? response.data : [response.data],
+    };
+  },
+
+  async getAllTransactions(): Promise<ApiResponse<AdminTransactionsResponse>> {
+    if (USE_MOCK_DATA) {
+      await simulateDelay(500);
+      return {
+        success: true,
+        data: {
+          totalTransactions: mockTransactions.length,
+          data: mockTransactions.map(transaction => ({
+            _id: transaction.id,
+            userId: transaction.userId,
+            amount: transaction.amount,
+            reference: transaction.reference,
+            status: transaction.status,
+            description: transaction.description,
+            type: transaction.type,
+            createdAt: transaction.createdAt,
+          })),
+        },
+      };
+    }
+
+    const response = await apiFetch<AdminTransaction[]>(
+      '/api/v1/admin/adminViewAllTransactions',
+    );
+    if (!response.success || !response.data) {
+      return { success: false, error: response.error, message: response.message };
+    }
+
+    return {
+      ...response,
+      data: {
+        totalTransactions: response.data.length,
+        data: response.data,
+      },
+    };
+  },
+
+  async getAllUserRoles(): Promise<ApiResponse<AdminUserRole[]>> {
+    if (USE_MOCK_DATA) {
+      await simulateDelay(400);
+      return {
+        success: true,
+        data: mockUsers.map(user => ({
+          _id: user.id,
+          firstName: user.fullName.split(' ')[0] || user.fullName,
+          lastName: user.fullName.split(' ').slice(1).join(' '),
+          email: user.email,
+          role: 'user',
+          isBlocked: !user.walletEnabled,
+          wallet: String(
+            mockWallets.find(wallet => wallet.userId === user.id)?.balance ?? 0,
+          ),
+        })),
+      };
+    }
+
+    const response = await apiFetch<AdminUserRole[]>(
+      '/api/v1/admin/adminViewAllUserRoles',
+    );
+    if (!response.success || !response.data) return response;
+
+    return {
+      ...response,
+      data: response.data.map(user => ({
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+        isBlocked: user.isBlocked,
+        wallet: user.wallet,
+      })),
+    };
+  },
+
+  async getTransactionById(
+    transactionId: string,
+  ): Promise<ApiResponse<AdminTransaction>> {
+    if (USE_MOCK_DATA) {
+      await simulateDelay(300);
+      const transaction = mockTransactions.find(item => item.id === transactionId);
+      if (!transaction) {
+        return { success: false, error: 'Transaction not found' };
+      }
+
+      return {
+        success: true,
+        data: {
+          _id: transaction.id,
+          userId: transaction.userId,
+          amount: transaction.amount,
+          reference: transaction.reference,
+          status: transaction.status,
+          description: transaction.description,
+          type: transaction.type,
+          createdAt: transaction.createdAt,
+        },
+      };
+    }
+
+    return apiFetch<AdminTransaction>(
+      `/api/v1/admin/adminViewTransactionById/${encodeURIComponent(transactionId)}`,
     );
   },
 };

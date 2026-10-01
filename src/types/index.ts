@@ -48,6 +48,94 @@ export interface AdminKycApprovalResponse {
   kycStatus: KYCStatus;
 }
 
+export interface AdminUserDetails {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  balance: number;
+  accountName: string | null;
+  accountNumber: string | null;
+  signUpOn: string;
+  lastLogin: string | null;
+  address: string | null;
+  status: string;
+  isBlocked?: boolean;
+}
+
+export interface AdminUserTransaction {
+  _id: string;
+  userId: string;
+  amount: number;
+  reference: string;
+  status: string;
+  description?: string;
+  type?: string;
+  createdAt: string;
+  updatedAt?: string;
+  meterNumber?: string;
+  meterAccountNumber?: string;
+  transactionFees?: number;
+}
+
+export interface AdminBlockUserResponse {
+  id: string;
+  fullName: string;
+  email: string;
+  isBlocked: boolean;
+  statusMessage: string;
+}
+
+export interface AdminTransactionUser {
+  _id: string;
+  email?: string;
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
+  phoneNumber?: string;
+}
+
+export interface AdminTransaction {
+  _id: string;
+  userId: string | AdminTransactionUser;
+  amount: number;
+  reference: string;
+  status: string;
+  description?: string;
+  type?: string;
+  createdAt: string;
+  updatedAt?: string;
+  meterNumber?: string;
+  meterAccountNumber?: string;
+  tariff?: string;
+  vendType?: string;
+  subclass?: string;
+  vendTime?: string;
+  unitsActual?: number;
+  unitName?: string;
+  transactionFees?: number;
+  vendorTransactionFees?: number;
+  clientTransactionFees?: number;
+  vat?: number;
+  tokenHex?: string;
+  tokenDec?: string;
+}
+
+export interface AdminTransactionsResponse {
+  totalTransactions: number;
+  data: AdminTransaction[];
+}
+
+export interface AdminUserRole {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  isBlocked: boolean;
+  wallet?: string;
+}
+
 export type KYCStatus = 'pending' | 'approved' | 'rejected';
 export type WalletStatus = 'enabled' | 'blocked' | 'pending';
 export type TransactionType = 'deposit' | 'withdrawal' | 'savings' | 'thrift';
