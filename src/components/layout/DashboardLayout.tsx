@@ -124,14 +124,17 @@ export default function DashboardLayout() {
           {/* User section */}
           <div className="p-4 border-t border-sidebar-border">
             <div className="flex items-center gap-3 px-2">
-              <img
-                src={
-                  admin?.avatar ||
-                  `https://api.dicebear.com/7.x/avataaars/svg?seed=${admin?.name}`
-                }
-                alt={admin?.name}
-                className="w-10 h-10 rounded-full bg-sidebar-accent"
-              />
+              {admin?.avatar ? (
+                <img
+                  src={admin.avatar}
+                  alt={admin.name}
+                  className="w-10 h-10 rounded-full bg-sidebar-accent"
+                />
+              ) : (
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sidebar-accent text-sm font-semibold">
+                  {admin?.name?.slice(0, 2).toUpperCase()}
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-sidebar-foreground truncate">
                   {admin?.name}
@@ -161,23 +164,29 @@ export default function DashboardLayout() {
 
             <div className="flex items-center gap-4">
               {/* Notifications */}
-              <button className="relative p-2 text-muted-foreground hover:text-foreground transition-colors">
+              <button
+                disabled
+                title="Notifications are unavailable in the documented API"
+                className="relative p-2 text-muted-foreground opacity-50"
+              >
                 <Bell className="w-5 h-5" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-destructive rounded-full" />
               </button>
 
               {/* User dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-muted transition-colors">
-                    <img
-                      src={
-                        admin?.avatar ||
-                        `https://api.dicebear.com/7.x/avataaars/svg?seed=${admin?.name}`
-                      }
-                      alt={admin?.name}
-                      className="w-8 h-8 rounded-full"
-                    />
+                    {admin?.avatar ? (
+                      <img
+                        src={admin.avatar}
+                        alt={admin.name}
+                        className="h-8 w-8 rounded-full"
+                      />
+                    ) : (
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                        {admin?.name?.slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
                     <span className="hidden sm:block text-sm font-medium">
                       {admin?.name?.split(" ")[0]}
                     </span>

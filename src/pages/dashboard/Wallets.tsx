@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { walletService } from '@/services/api';
 import { Wallet } from '@/types';
-import { formatCurrency, formatDateTime, getUserById } from '@/data/mockData';
+import { formatCurrency, formatDateTime } from '@/utils/format';
 import {
   PageHeader,
   StatusBadge,
@@ -113,19 +113,12 @@ export default function WalletsPage() {
           </thead>
           <tbody>
             {wallets.map((wallet) => {
-              const user = getUserById(wallet.userId);
               return (
                 <tr key={wallet.id}>
                   <td>
                     <div className="flex items-center gap-3">
-                      <img
-                        src={user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.fullName}`}
-                        alt={user?.fullName}
-                        className="w-10 h-10 rounded-full"
-                      />
                       <div>
-                        <p className="font-medium">{user?.fullName}</p>
-                        <p className="text-xs text-muted-foreground">{user?.email}</p>
+                        <p className="font-medium">User {wallet.userId}</p>
                       </div>
                     </div>
                   </td>

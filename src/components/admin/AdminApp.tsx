@@ -64,10 +64,7 @@ import {
   Line,
   CartesianGrid,
 } from "recharts";
-import { ImageWithFallback } from "../figma/ImageWithFallback";
-import { ShopProductForm } from "./ShopProductForm";
 import { useAuth } from "@/hooks/useAuth";
-import { FullScreenChat } from "./FullScreenChat";
 import {
   useAdminUserDetails,
   useAdminUserTransactions,
@@ -78,10 +75,27 @@ import {
   useApproveAdminKyc,
   useBlockAdminUser,
   useCreateAdminAccount,
+  useCreateAdminSavingsGroup,
+  useAdminSavingsGroups,
   usePendingAdminKyc,
+  useAdminDashboardTotals,
+  useAdminTotalMembers,
+  useAdminUserStatistics,
+  useAdminDailyRegistrations,
+  useAdminRetentionStatistics,
+  useAdminCohortAnalysis,
+  useAdminVendingGraph,
+  useAdminYearlyVending,
+  useAdminLeaderboard,
+  useAdminSystemHealth,
 } from "@/hooks/useAdmin";
+import type {
+  AdminDailyRegistration,
+  AdminSavingsGroup,
+} from "@/services/api";
 import { toast } from "@/components/ui/sonner";
 import type {
+  AdminTransaction,
   AdminPendingKycUser,
   AdminTransactionUser,
   AdminUserRole,
@@ -110,12 +124,12 @@ export interface Member {
   id: string;
   name: string;
   email: string;
-  phone: string;
-  kyc: "approved" | "pending" | "rejected";
+  phone?: string;
+  kyc: string;
   joined: string;
-  wallet: number;
-  savings: number;
-  status: "active" | "inactive" | "pending" | "suspended";
+  wallet?: number;
+  savings?: number;
+  status: string;
   group: string;
   accountNumber?: string;
   bankName?: string;
@@ -155,38 +169,7 @@ export interface SavingsProgram {
   collected: number;
   started: string;
   nextCycle: string;
-  status: "active" | "completed" | "paused";
-}
-
-export interface Product {
-  id: string;
-  name: string;
-  category: string;
-  price: number;
-  image: string;
-  stock: number;
-  sales: number;
-  status: "active" | "out_of_stock";
-  description?: string;
-  specs?: string[];
-}
-
-export interface NotificationItem {
-  id: string;
-  title: string;
-  description: string;
-  time: string;
-  read: boolean;
-  category: "kyc" | "wallet" | "savings" | "marketplace";
-  actionSection: AdminSection;
-}
-
-export interface Conversation {
-  id: number;
-  name: string;
-  lastMsg: string;
-  time: string;
-  unread: number;
+  status: string;
 }
 
 export interface WalletLedgerItem {
@@ -199,268 +182,60 @@ export interface WalletLedgerItem {
   ref: string;
 }
 
-// ─── Initial Mock Data ────────────────────────────────────────────────────────
-const INITIAL_MEMBERS: Member[] = [
-  {
-    id: "1",
-    name: "Emeka Adeyemi",
-    email: "emeka@email.com",
-    phone: "+234 801 234 5678",
-    kyc: "approved",
-    joined: "Jun 1, 2024",
-    wallet: 247500,
-    savings: 382500,
-    status: "active",
-    group: "Community Thrift",
-    accountNumber: "9928374610",
-    bankName: "PAVE Virtual Bank / Providus",
-    tier: "Tier 3 - Verified",
-  },
-  {
-    id: "2",
-    name: "Chinwe Okonkwo",
-    email: "chinwe@email.com",
-    phone: "+234 805 876 5432",
-    kyc: "pending",
-    joined: "Jun 5, 2024",
-    wallet: 85000,
-    savings: 120000,
-    status: "active",
-    group: "Community Thrift",
-    accountNumber: "9928374611",
-    bankName: "PAVE Virtual Bank / Providus",
-    tier: "Tier 2 - Basic",
-  },
-  {
-    id: "3",
-    name: "Adewale Bello",
-    email: "adewale@email.com",
-    phone: "+234 809 123 4567",
-    kyc: "rejected",
-    joined: "Jun 8, 2024",
-    wallet: 0,
-    savings: 0,
-    status: "inactive",
-    group: "Staff Coop",
-    accountNumber: "9928374612",
-    bankName: "PAVE Virtual Bank / Providus",
-    tier: "Tier 1 - Unverified",
-  },
-  {
-    id: "4",
-    name: "Fatima Hassan",
-    email: "fatima@email.com",
-    phone: "+234 803 987 6543",
-    kyc: "approved",
-    joined: "May 20, 2024",
-    wallet: 178000,
-    savings: 95000,
-    status: "active",
-    group: "Community Thrift",
-    accountNumber: "9928374613",
-    bankName: "PAVE Virtual Bank / Providus",
-    tier: "Tier 3 - Verified",
-  },
-  {
-    id: "5",
-    name: "Oluwaseun Afolabi",
-    email: "seun@email.com",
-    phone: "+234 806 543 2109",
-    kyc: "approved",
-    joined: "May 15, 2024",
-    wallet: 312000,
-    savings: 450000,
-    status: "active",
-    group: "Staff Coop",
-    accountNumber: "9928374614",
-    bankName: "PAVE Virtual Bank / Providus",
-    tier: "Tier 3 - Verified",
-  },
-  {
-    id: "6",
-    name: "Amaka Eze",
-    email: "amaka@email.com",
-    phone: "+234 802 345 6789",
-    kyc: "pending",
-    joined: "Jun 12, 2024",
-    wallet: 0,
-    savings: 0,
-    status: "pending",
-    group: "Community Thrift",
-    accountNumber: "9928374615",
-    bankName: "PAVE Virtual Bank / Providus",
-    tier: "Tier 1 - Unverified",
-  },
-];
+function mapAdminRoleToMember(user: AdminUserRole): Member {
+  const balance =
+    user.wallet !== undefined && Number.isFinite(Number(user.wallet))
+      ? Number(user.wallet)
+      : undefined;
 
-const INITIAL_SAVINGS_PROGRAMS: SavingsProgram[] = [
-  {
-    id: "1",
-    name: "PAVE Community Thrift",
-    type: "Monthly",
-    members: 24,
-    target: 1000000,
-    collected: 680000,
-    started: "Jan 1, 2024",
-    nextCycle: "Jul 1, 2024",
-    status: "active",
-  },
-  {
-    id: "2",
-    name: "Staff Cooperative",
-    type: "Bi-weekly",
-    members: 18,
-    target: 500000,
-    collected: 220000,
-    started: "Mar 1, 2024",
-    nextCycle: "Jun 21, 2024",
-    status: "active",
-  },
-  {
-    id: "3",
-    name: "Holiday Savings",
-    type: "Weekly",
-    members: 12,
-    target: 300000,
-    collected: 300000,
-    started: "Jan 15, 2024",
-    nextCycle: "—",
-    status: "completed",
-  },
-];
+  return {
+    id: user._id,
+    name: `${user.firstName} ${user.lastName}`.trim() || user.email,
+    email: user.email,
+    kyc: "Not available",
+    joined: "Not available",
+    ...(balance !== undefined ? { wallet: balance } : {}),
+    status: user.isBlocked ? "Blocked" : "Not blocked",
+    group: "Not available",
+  };
+}
 
-const INITIAL_PRODUCTS: Product[] = [
-  {
-    id: "1",
-    name: "Samsung Galaxy S25 Ultra",
-    category: "Electronics",
-    price: 850000,
-    image:
-      "https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=400&h=400&fit=crop",
-    stock: 15,
-    sales: 8,
-    status: "active",
-    description:
-      "Next-generation flagship smartphone with 200MP camera, built-in S-Pen, Titanium armor frame, and AI-powered productivity features.",
-    specs: [
-      "256GB / 512GB Storage",
-      "12GB LPDDR5X RAM",
-      "Dynamic AMOLED 2X 120Hz",
-      "5000mAh All-Day Battery",
-    ],
-  },
-  {
-    id: "2",
-    name: 'LG 55" OLED Smart TV',
-    category: "Electronics",
-    price: 680000,
-    image: "/images/lg_oled_tv.jpg",
-    stock: 6,
-    sales: 3,
-    status: "active",
-    description:
-      "Self-lit OLED pixels offering infinite contrast, 4K Cinema HDR, Dolby Vision IQ, and ultra-smooth gaming at 120Hz.",
-    specs: [
-      "4K Ultra HD (3,840 x 2,160)",
-      "α9 Gen6 AI Processor",
-      "Dolby Atmos Audio",
-      "webOS 24 with ThinQ AI",
-    ],
-  },
-  {
-    id: "3",
-    name: "Dyson V15 Vacuum",
-    category: "Home",
-    price: 185000,
-    image:
-      "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=400&fit=crop",
-    stock: 0,
-    sales: 22,
-    status: "out_of_stock",
-    description:
-      "Intelligent cordless vacuum with laser illumination that reveals invisible micro-dust on hard floors.",
-    specs: [
-      "Up to 60 Mins Runtime",
-      "Piezo Acoustic Dust Sensor",
-      "Hyperdymium Motor (125,000rpm)",
-      "Whole-machine HEPA Filtration",
-    ],
-  },
-];
+function mapSavingsGroup(group: AdminSavingsGroup): SavingsProgram {
+  return {
+    id: group.id,
+    name: group.name,
+    type: group.frequency,
+    members: group.currentMembers,
+    target: group.targetAmount,
+    collected: group.currentBalance,
+    started: group.startDate
+      ? new Date(group.startDate).toLocaleDateString()
+      : "Not available",
+    nextCycle: "Not available",
+    status: group.status,
+  };
+}
 
-const INITIAL_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: "notif_1",
-    title: "New KYC Submission",
-    description: "Amaka Eze submitted verification documents for review.",
-    time: "5m ago",
-    read: false,
-    category: "kyc",
-    actionSection: "kyc",
-  },
-  {
-    id: "notif_2",
-    title: "Thrift Contribution Received",
-    description: "₦50,000 deposited in PAVE Community Thrift by Emeka Adeyemi.",
-    time: "22m ago",
-    read: false,
-    category: "savings",
-    actionSection: "savings-programs",
-  },
-  {
-    id: "notif_3",
-    title: "Marketplace Plan Started",
-    description:
-      "Emeka initiated a 50% down payment plan for Galaxy S25 Ultra.",
-    time: "1h ago",
-    read: true,
-    category: "marketplace",
-    actionSection: "marketplace",
-  },
-  {
-    id: "notif_4",
-    title: "KYC Verified",
-    description:
-      "Chinwe Okonkwo's KYC verification was completed successfully.",
-    time: "2h ago",
-    read: true,
-    category: "kyc",
-    actionSection: "kyc",
-  },
-  {
-    id: "notif_5",
-    title: "Wallet Direct Deposit",
-    description: "₦100,000 wallet funding by Oluwaseun via bank transfer.",
-    time: "3h ago",
-    read: true,
-    category: "wallet",
-    actionSection: "wallets",
-  },
-];
+function isAdminTransaction(value: unknown): value is AdminTransaction {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const transaction = value as Record<string, unknown>;
+  const userId = transaction.userId;
+  const validUserId =
+    typeof userId === "string" ||
+    (!!userId &&
+      typeof userId === "object" &&
+      !Array.isArray(userId) &&
+      typeof (userId as Record<string, unknown>)._id === "string");
 
-const REVENUE_DATA = [
-  { month: "Jan", wallet: 4200000, savings: 3100000, marketplace: 850000 },
-  { month: "Feb", wallet: 5800000, savings: 3800000, marketplace: 1200000 },
-  { month: "Mar", wallet: 6200000, savings: 4200000, marketplace: 980000 },
-  { month: "Apr", wallet: 7100000, savings: 5100000, marketplace: 1450000 },
-  { month: "May", wallet: 8900000, savings: 6300000, marketplace: 1800000 },
-  { month: "Jun", wallet: 9400000, savings: 7200000, marketplace: 2100000 },
-];
-
-const MEMBER_GROWTH = [
-  { month: "Jan", members: 12 },
-  { month: "Feb", members: 18 },
-  { month: "Mar", members: 24 },
-  { month: "Apr", members: 32 },
-  { month: "May", members: 41 },
-  { month: "Jun", members: 56 },
-];
-
-const PIE_DATA = [
-  { name: "Approved", value: 68, color: "#059669" },
-  { name: "Pending", value: 20, color: "#D97706" },
-  { name: "Rejected", value: 12, color: "#DC2626" },
-];
+  return (
+    typeof transaction._id === "string" &&
+    validUserId &&
+    typeof transaction.amount === "number" &&
+    typeof transaction.reference === "string" &&
+    typeof transaction.status === "string" &&
+    typeof transaction.createdAt === "string"
+  );
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmt = (n: number) => `₦${n.toLocaleString()}`;
@@ -518,6 +293,27 @@ function StatCard({
           {sub}
         </div>
       )}
+    </div>
+  );
+}
+
+function QueryErrorNotice({
+  error,
+  onRetry,
+}: {
+  error: unknown;
+  onRetry: () => void;
+}) {
+  if (!error) return null;
+  return (
+    <div
+      role="alert"
+      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
+    >
+      <span>{error instanceof Error ? error.message : "Unable to load data"}</span>
+      <button onClick={onRetry} className="font-semibold underline">
+        Retry
+      </button>
     </div>
   );
 }
@@ -588,11 +384,27 @@ function DashboardSection({
   onNav: (s: AdminSection) => void;
   onInvite: () => void;
 }) {
+  const totalsQuery = useAdminDashboardTotals();
+  const membersQuery = useAdminTotalMembers();
+  const members = membersQuery.data;
+  const registrationsQuery = useAdminDailyRegistrations();
+  const pendingKycQuery = usePendingAdminKyc();
+  const vendingQuery = useAdminVendingGraph();
+  const transactionsQuery = useAdminTransactions();
+  const vendingData = vendingQuery.data?.monthly ?? [];
+  const registrations = registrationsQuery.data ?? [];
+  const recentTransactions = [...(transactionsQuery.data?.data ?? [])]
+    .sort(
+      (left, right) =>
+        new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+    )
+    .slice(0, 5);
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Dashboard"
-        subtitle="Welcome back, Admin Benjamin 👋"
+        subtitle="Platform overview"
         action={
           <div className="flex items-center gap-2">
             <button
@@ -612,38 +424,53 @@ function DashboardSection({
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           label="Total Members"
-          value="56"
-          sub="+8 this month"
+          value={membersQuery.isLoading ? "..." : members === undefined ? "Unavailable" : members.toLocaleString()}
+          sub="From the admin member count endpoint"
           icon={<Users size={20} />}
-          trend={14}
         />
         <StatCard
           label="Total Wallet"
-          value="₦12.4M"
+          value={totalsQuery.isLoading ? "..." : totalsQuery.data?.totalWalletBalance === undefined ? "Unavailable" : fmt(totalsQuery.data.totalWalletBalance)}
           sub="Across all members"
           icon={<Wallet size={20} />}
-          trend={22}
           color="#059669"
           bg="#ECFDF5"
         />
         <StatCard
           label="Total Savings"
-          value="₦8.9M"
-          sub="Active goals: 142"
+          value={totalsQuery.isLoading ? "..." : totalsQuery.data?.totalSavings === undefined ? "Unavailable" : fmt(totalsQuery.data.totalSavings)}
+          sub={totalsQuery.data?.totalSavings === undefined ? "Not returned by the documented totals response" : "Backend total"}
           icon={<PiggyBank size={20} />}
-          trend={18}
           color="#D97706"
           bg="#FFFBEB"
         />
         <StatCard
           label="KYC Pending"
-          value="3"
+          value={pendingKycQuery.isLoading ? "..." : pendingKycQuery.data ? String(pendingKycQuery.data.length) : pendingKycQuery.isError ? "Unavailable" : "0"}
           sub="Needs your review"
           icon={<Shield size={20} />}
           color="#DC2626"
           bg="#FEF2F2"
         />
       </div>
+      {totalsQuery.isError && (
+        <QueryErrorNotice
+          error={totalsQuery.error}
+          onRetry={() => void totalsQuery.refetch()}
+        />
+      )}
+      {membersQuery.isError && (
+        <QueryErrorNotice
+          error={membersQuery.error}
+          onRetry={() => void membersQuery.refetch()}
+        />
+      )}
+      {pendingKycQuery.isError && (
+        <QueryErrorNotice
+          error={pendingKycQuery.error}
+          onRetry={() => void pendingKycQuery.refetch()}
+        />
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <div className="xl:col-span-2 bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
@@ -656,12 +483,22 @@ function DashboardSection({
               }}
               className="text-[#0D0F1C] dark:text-[#F0F2FF]"
             >
-              Revenue Overview
+              Vending Activity
             </h3>
-            <Badge color="indigo">Last 6 months</Badge>
+            <Badge color="indigo">Monthly</Badge>
           </div>
+          {vendingQuery.isLoading ? (
+            <div className="flex h-[220px] items-center justify-center text-sm text-[#9CA3AF]">Loading vending activity...</div>
+          ) : vendingQuery.isError ? (
+            <div className="flex h-[220px] flex-col items-center justify-center gap-3 text-sm text-red-600">
+              <span>{vendingQuery.error.message}</span>
+              <button onClick={() => void vendingQuery.refetch()} className="font-semibold text-[#3730A3]">Retry</button>
+            </div>
+          ) : vendingData.length === 0 ? (
+            <div className="flex h-[220px] items-center justify-center text-sm text-[#9CA3AF]">No monthly vending data found.</div>
+          ) : (
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={REVENUE_DATA}>
+            <AreaChart data={vendingData}>
               <defs>
                 <linearGradient id="walletGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#3730A3" stopOpacity={0.25} />
@@ -703,22 +540,15 @@ function DashboardSection({
               />
               <Area
                 type="monotone"
-                dataKey="wallet"
+                dataKey="totalAmount"
                 stroke="#3730A3"
                 strokeWidth={2.5}
                 fill="url(#walletGrad)"
-                name="Wallet"
-              />
-              <Area
-                type="monotone"
-                dataKey="savings"
-                stroke="#059669"
-                strokeWidth={2}
-                fill="url(#savingsGrad)"
-                name="Savings"
+                name="Vending amount"
               />
             </AreaChart>
           </ResponsiveContainer>
+          )}
         </div>
 
         <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
@@ -732,51 +562,21 @@ function DashboardSection({
           >
             KYC Status
           </h3>
-          <ResponsiveContainer width="100%" height={160}>
-            <PieChart>
-              <Pie
-                data={PIE_DATA}
-                cx="50%"
-                cy="50%"
-                innerRadius={45}
-                outerRadius={70}
-                dataKey="value"
-                strokeWidth={0}
-              >
-                {PIE_DATA.map((entry, i) => (
-                  <Cell key={i} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip
-                formatter={(v: unknown) => `${String(v)}%`}
-                contentStyle={{
-                  borderRadius: 12,
-                  border: "none",
-                  fontSize: 12,
-                }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="flex flex-col gap-2 mt-2">
-            {PIE_DATA.map((d) => (
-              <div
-                key={d.name}
-                className="flex items-center justify-between text-sm"
-              >
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ background: d.color }}
-                  />
-                  <span className="text-[#6B7280] dark:text-[#94A3B8]">
-                    {d.name}
-                  </span>
-                </div>
-                <span className="font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
-                  {d.value}%
-                </span>
-              </div>
-            ))}
+          <div className="flex h-[220px] flex-col items-center justify-center gap-2 text-center">
+            {pendingKycQuery.isLoading ? (
+              <span className="text-sm text-[#9CA3AF]">Loading pending KYC...</span>
+            ) : pendingKycQuery.isError ? (
+              <>
+                <span className="text-sm text-red-600">{pendingKycQuery.error.message}</span>
+                <button onClick={() => void pendingKycQuery.refetch()} className="text-sm font-semibold text-[#3730A3]">Retry</button>
+              </>
+            ) : (
+              <>
+                <span className="text-4xl font-bold text-[#D97706]">{pendingKycQuery.data.length}</span>
+                <span className="text-sm text-[#6B7280] dark:text-[#94A3B8]">Pending submissions</span>
+                <span className="max-w-[230px] text-xs text-[#9CA3AF]">The API collection does not provide approved/rejected counts for a KYC breakdown chart.</span>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -793,10 +593,20 @@ function DashboardSection({
           >
             Member Growth
           </h3>
+          {registrationsQuery.isLoading ? (
+            <div className="flex h-[160px] items-center justify-center text-sm text-[#9CA3AF]">Loading daily registrations...</div>
+          ) : registrationsQuery.isError ? (
+            <div className="flex h-[160px] flex-col items-center justify-center gap-3 text-sm text-red-600">
+              <span>{registrationsQuery.error.message}</span>
+              <button onClick={() => void registrationsQuery.refetch()} className="font-semibold text-[#3730A3]">Retry</button>
+            </div>
+          ) : registrations.length === 0 ? (
+            <div className="flex h-[160px] items-center justify-center text-sm text-[#9CA3AF]">No daily registrations found.</div>
+          ) : (
           <ResponsiveContainer width="100%" height={160}>
-            <BarChart data={MEMBER_GROWTH}>
+            <BarChart data={registrations}>
               <XAxis
-                dataKey="month"
+                dataKey="date"
                 tick={{ fontSize: 11, fill: "#9CA3AF" }}
                 axisLine={false}
                 tickLine={false}
@@ -814,13 +624,14 @@ function DashboardSection({
                 }}
               />
               <Bar
-                dataKey="members"
+                dataKey="registrations"
                 fill="#3730A3"
                 radius={[6, 6, 0, 0]}
-                name="Members"
+                name="Registrations"
               />
             </BarChart>
           </ResponsiveContainer>
+          )}
         </div>
 
         <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
@@ -832,56 +643,33 @@ function DashboardSection({
             }}
             className="mb-4 text-[#0D0F1C] dark:text-[#F0F2FF]"
           >
-            Recent Activity
+            Recent Transactions
           </h3>
           <div className="flex flex-col gap-3">
-            {[
-              {
-                icon: "👤",
-                text: "Amaka Eze submitted KYC",
-                time: "5m ago",
-                color: "#3730A3",
-              },
-              {
-                icon: "💰",
-                text: "₦50,000 deposited in Community Thrift",
-                time: "22m ago",
-                color: "#059669",
-              },
-              {
-                icon: "🛍️",
-                text: "Emeka started payment plan for Galaxy S25",
-                time: "1h ago",
-                color: "#7C3AED",
-              },
-              {
-                icon: "✅",
-                text: "Chinwe Okonkwo's KYC approved",
-                time: "2h ago",
-                color: "#059669",
-              },
-              {
-                icon: "💳",
-                text: "₦100,000 wallet funding by Oluwaseun",
-                time: "3h ago",
-                color: "#059669",
-              },
-            ].map((a, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-base"
-                  style={{ background: `${a.color}15` }}
-                >
-                  {a.icon}
+            {transactionsQuery.isLoading ? <div className="text-sm text-[#9CA3AF]">Loading transactions...</div> : null}
+            {transactionsQuery.isError ? (
+              <div className="text-sm text-red-600">
+                <p>{transactionsQuery.error.message}</p>
+                <button onClick={() => void transactionsQuery.refetch()} className="mt-2 font-semibold text-[#3730A3]">Retry</button>
+              </div>
+            ) : null}
+            {!transactionsQuery.isLoading && !transactionsQuery.isError && recentTransactions.length === 0 ? (
+              <div className="text-sm text-[#9CA3AF]">No transactions found.</div>
+            ) : null}
+            {recentTransactions.map((transaction) => (
+              <div key={transaction._id} className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#EEF2FF] text-[#3730A3]">
+                  <TransactionsIcon size={16} />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm text-[#374151] dark:text-[#F0F2FF] truncate">
-                    {a.text}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm text-[#374151] dark:text-[#F0F2FF]">
+                    {transaction.description || transaction.type || transaction.reference}
+                  </div>
+                  <div className="text-xs text-[#9CA3AF]">
+                    {new Date(transaction.createdAt).toLocaleString()}
                   </div>
                 </div>
-                <div className="text-xs text-[#9CA3AF] flex-shrink-0">
-                  {a.time}
-                </div>
+                <div className="flex-shrink-0 text-xs font-semibold">{fmt(Number(transaction.amount))}</div>
               </div>
             ))}
           </div>
@@ -895,7 +683,7 @@ function DashboardSection({
           </div>
           <div>
             <div className="font-bold text-[#92400E] dark:text-[#FBBF24]">
-              3 KYC Submissions Awaiting Review
+              {pendingKycQuery.data?.length ?? "—"} KYC Submissions Awaiting Review
             </div>
             <div className="text-sm text-[#B45309] dark:text-[#FBBF24]/80">
               Members are waiting for account activation
@@ -916,11 +704,17 @@ function DashboardSection({
 // ─── Members Section ──────────────────────────────────────────────────────────
 function MembersSection({
   members,
+  isLoading,
+  error,
+  onRetry,
   onNav,
   setSelectedMember,
   onInvite,
 }: {
   members: Member[];
+  isLoading: boolean;
+  error: string | null;
+  onRetry: () => void;
   onNav: (s: AdminSection) => void;
   setSelectedMember: (m: Member) => void;
   onInvite: () => void;
@@ -931,18 +725,18 @@ function MembersSection({
   const filtered = members.filter(
     (m) =>
       (filter === "All" ||
-        m.kyc.toLowerCase() === filter.toLowerCase() ||
-        m.status.toLowerCase() === filter.toLowerCase()) &&
+        (filter === "Blocked" && m.status === "Blocked") ||
+        (filter === "Not blocked" && m.status === "Not blocked")) &&
       (m.name.toLowerCase().includes(search.toLowerCase()) ||
         m.email.toLowerCase().includes(search.toLowerCase()) ||
-        m.phone.includes(search)),
+        (m.phone || "").includes(search)),
   );
 
   return (
     <div>
       <PageHeader
         title="Member Management"
-        subtitle={`${members.length} total members`}
+        subtitle={isLoading ? "Loading members..." : `${members.length} members returned by the API`}
         action={
           <button
             onClick={onInvite}
@@ -965,7 +759,7 @@ function MembersSection({
             />
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
-            {["All", "Active", "Pending", "Approved"].map((f) => (
+            {["All", "Blocked", "Not blocked"].map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -980,6 +774,18 @@ function MembersSection({
             ))}
           </div>
         </div>
+        {isLoading ? (
+          <div className="p-8 text-center text-sm text-[#9CA3AF]">Loading users...</div>
+        ) : error ? (
+          <div className="p-8 text-center">
+            <p role="alert" className="mb-3 text-sm text-red-600">{error}</p>
+            <button onClick={onRetry} className="text-sm font-semibold text-[#3730A3]">Retry</button>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="p-8 text-center text-sm text-[#9CA3AF]">
+            {members.length === 0 ? "No users found." : "No users match these filters."}
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[650px]">
             <thead className="bg-[#F9FAFB] dark:bg-white/5 border-b border-[#F1F3FB] dark:border-white/10">
@@ -1028,32 +834,18 @@ function MembersSection({
                     {m.group}
                   </td>
                   <td className="px-4 py-3.5 text-sm font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
-                    {fmt(m.wallet)}
+                    {m.wallet === undefined ? "—" : fmt(m.wallet)}
                   </td>
                   <td className="px-4 py-3.5 text-sm font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
-                    {fmt(m.savings)}
+                    {m.savings === undefined ? "—" : fmt(m.savings)}
+                  </td>
+                  <td className="px-4 py-3.5">
+                    <Badge color="gray">{m.kyc}</Badge>
                   </td>
                   <td className="px-4 py-3.5">
                     <Badge
                       color={
-                        m.kyc === "approved"
-                          ? "green"
-                          : m.kyc === "pending"
-                            ? "gold"
-                            : "red"
-                      }
-                    >
-                      {m.kyc}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <Badge
-                      color={
-                        m.status === "active"
-                          ? "green"
-                          : m.status === "pending"
-                            ? "gold"
-                            : "gray"
+                        m.status === "Blocked" ? "red" : "gray"
                       }
                     >
                       {m.status}
@@ -1075,6 +867,7 @@ function MembersSection({
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </div>
   );
@@ -1084,30 +877,44 @@ function MembersSection({
 function MemberDetailSection({
   member,
   onBack,
-  onUpdateMember,
 }: {
-  member: Member;
+  member: Member | null;
   onBack: () => void;
-  onUpdateMember?: (id: string, updates: Partial<Member>) => void;
 }) {
-  const m = member || INITIAL_MEMBERS[0];
-  const [kycStatus, setKycStatus] = useState<
-    "approved" | "pending" | "rejected"
-  >(m.kyc);
-  const [memberStatus, setMemberStatus] = useState<
-    "active" | "inactive" | "pending" | "suspended"
-  >(m.status);
+  const detailsQuery = useAdminUserDetails(member?.email, !!member);
+  const blockUser = useBlockAdminUser();
 
-  const handleApprove = () => {
-    setKycStatus("approved");
-    setMemberStatus("active");
-    if (onUpdateMember)
-      onUpdateMember(m.id, { kyc: "approved", status: "active" });
-  };
+  if (!member) {
+    return (
+      <div className="rounded-2xl border border-[#F1F3FB] bg-white p-8 text-center text-sm text-[#9CA3AF] dark:border-white/10 dark:bg-[#111327]">
+        Select a member from the users list to view details.
+        <button onClick={onBack} className="ml-2 font-semibold text-[#3730A3]">Back to members</button>
+      </div>
+    );
+  }
+  if (detailsQuery.isLoading) {
+    return <div className="rounded-2xl bg-white p-8 text-center text-sm text-[#9CA3AF] dark:bg-[#111327]">Loading member details...</div>;
+  }
+  if (detailsQuery.isError || !detailsQuery.data) {
+    return (
+      <div className="rounded-2xl bg-white p-8 text-center dark:bg-[#111327]">
+        <p role="alert" className="mb-3 text-sm text-red-600">
+          {detailsQuery.error instanceof Error ? detailsQuery.error.message : "Unable to load member details"}
+        </p>
+        <button onClick={() => void detailsQuery.refetch()} className="font-semibold text-[#3730A3]">Retry</button>
+      </div>
+    );
+  }
 
-  const handleSuspend = () => {
-    setMemberStatus("suspended");
-    if (onUpdateMember) onUpdateMember(m.id, { status: "suspended" });
+  const m = { ...member, ...detailsQuery.data };
+  const blocked = detailsQuery.data.isBlocked === true;
+  const handleBlock = async () => {
+    try {
+      const response = await blockUser.mutateAsync(m.email);
+      toast.success(response.statusMessage || "User blocked");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to block user");
+    }
   };
 
   return (
@@ -1132,7 +939,7 @@ function MemberDetailSection({
             {m.name}
           </h1>
           <p className="text-[#6B7280] dark:text-[#94A3B8] text-sm">
-            Member since {m.joined}
+            Member since {m.signUpOn ? new Date(m.signUpOn).toLocaleDateString() : "Not available"}
           </p>
         </div>
       </div>
@@ -1149,27 +956,17 @@ function MemberDetailSection({
               {m.name}
             </div>
             <div className="text-sm text-[#9CA3AF]">{m.email}</div>
-            <div className="text-sm text-[#9CA3AF]">{m.phone}</div>
+            <div className="text-sm text-[#9CA3AF]">{m.phone || "Not available"}</div>
           </div>
-          <Badge
-            color={
-              kycStatus === "approved"
-                ? "green"
-                : kycStatus === "pending"
-                  ? "gold"
-                  : "red"
-            }
-          >
-            KYC: {kycStatus}
-          </Badge>
+          <Badge color="gray">KYC: Not available</Badge>
           <div className="grid grid-cols-2 gap-3 w-full">
-            <button className="py-2 bg-[#EEF2FF] dark:bg-[#818CF8]/20 text-[#3730A3] dark:text-[#818CF8] rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 hover:opacity-90">
+            <a href={`mailto:${m.email}`} className="py-2 bg-[#EEF2FF] dark:bg-[#818CF8]/20 text-[#3730A3] dark:text-[#818CF8] rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 hover:opacity-90">
               <Mail size={13} />
               Email
-            </button>
-            <button className="py-2 bg-[#ECFDF5] dark:bg-[#10B981]/20 text-[#059669] dark:text-[#10B981] rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 hover:opacity-90">
+            </a>
+            <button disabled title="Messaging API is not available" className="py-2 bg-[#ECFDF5] dark:bg-[#10B981]/20 text-[#059669] dark:text-[#10B981] rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 opacity-50">
               <MessageSquare size={13} />
-              Message
+              Message unavailable
             </button>
           </div>
         </div>
@@ -1184,7 +981,7 @@ function MemberDetailSection({
                     "var(--font-family-display, 'Bricolage Grotesque')",
                 }}
               >
-                {fmt(m.wallet)}
+                {m.balance === undefined ? "—" : fmt(Number(m.balance))}
               </div>
             </div>
             <div className="bg-white dark:bg-[#111327] rounded-2xl p-4 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
@@ -1196,7 +993,7 @@ function MemberDetailSection({
                     "var(--font-family-display, 'Bricolage Grotesque')",
                 }}
               >
-                {fmt(m.savings)}
+                —
               </div>
             </div>
           </div>
@@ -1207,11 +1004,11 @@ function MemberDetailSection({
             <div className="flex flex-col gap-2">
               {[
                 ["Group", m.group],
-                ["Status", memberStatus],
-                ["Joined", m.joined],
-                ["KYC Status", kycStatus],
-                ["Account Number", m.accountNumber || "9928374610"],
-                ["Bank Tier", m.tier || "Tier 3 - Verified"],
+                ["Status", m.status || "Not available"],
+                ["Joined", m.signUpOn ? new Date(m.signUpOn).toLocaleDateString() : "Not available"],
+                ["KYC Status", "Not available"],
+                ["Account Number", m.accountNumber || "Not available"],
+                ["Bank Tier", "Not available"],
               ].map(([k, v]) => (
                 <div
                   key={k}
@@ -1227,16 +1024,11 @@ function MemberDetailSection({
           </div>
           <div className="flex flex-col sm:flex-row gap-3">
             <button
-              onClick={handleApprove}
-              className="flex-1 py-2.5 bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5] dark:bg-[#10B981]/20 dark:text-[#10B981] rounded-xl text-sm font-semibold transition-colors shadow-sm"
+              onClick={() => void handleBlock()}
+              disabled={blocked || blockUser.isPending}
+              className="flex-1 py-2.5 bg-[#FEF2F2] text-[#DC2626] hover:bg-[#FEE2E2] dark:bg-[#EF4444]/20 dark:text-[#EF4444] rounded-xl text-sm font-semibold transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Approve KYC
-            </button>
-            <button
-              onClick={handleSuspend}
-              className="flex-1 py-2.5 bg-[#FEF2F2] text-[#DC2626] hover:bg-[#FEE2E2] dark:bg-[#EF4444]/20 dark:text-[#EF4444] rounded-xl text-sm font-semibold transition-colors shadow-sm"
-            >
-              Suspend Member
+              {blocked ? "User Blocked" : blockUser.isPending ? "Blocking..." : "Block Member"}
             </button>
           </div>
         </div>
@@ -1363,16 +1155,16 @@ function KYCSection({
                 ))}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-                {["ID Front", "ID Back", "Selfie"].map((doc) => (
+                {["Document image"].map((doc) => (
                   <div
                     key={doc}
                     onClick={() => setPreviewDoc(`${k.name} - ${doc}`)}
-                    className="aspect-[4/3] bg-[#F1F3FB] dark:bg-white/5 rounded-xl flex items-center justify-center cursor-pointer hover:bg-[#EEF2FF] dark:hover:bg-white/10 transition-colors border border-transparent hover:border-[#3730A3]/20"
+                    className="aspect-[4/3] bg-[#F1F3FB] dark:bg-white/5 rounded-xl flex items-center justify-center cursor-pointer border border-dashed border-[#D1D5DB] dark:border-white/10"
                   >
                     <div className="text-center">
                       <Eye size={20} className="text-[#9CA3AF] mx-auto" />
                       <div className="text-xs text-[#9CA3AF] font-medium mt-1">
-                        {doc}
+                      Not included in API response
                       </div>
                     </div>
                   </div>
@@ -1429,16 +1221,12 @@ function KYCSection({
               </div>
               <div className="aspect-[16/10] bg-[#F1F3FB] dark:bg-white/5 rounded-xl flex items-center justify-center overflow-hidden border border-dashed border-gray-300 dark:border-gray-700">
                 <div className="text-center p-6">
-                  <Shield
-                    size={48}
-                    className="text-[#3730A3] mx-auto mb-2 opacity-50"
-                  />
+                  <Shield size={48} className="text-[#3730A3] mx-auto mb-2 opacity-50" />
                   <p className="text-sm font-medium text-[#374151] dark:text-gray-300">
-                    Government Verified Identification
+                    Document image unavailable
                   </p>
                   <p className="text-xs text-[#9CA3AF] mt-1">
-                    High resolution document verification verified by Nimc /
-                    FRSC
+                    The pending-KYC API does not include a document URL or image.
                   </p>
                 </div>
               </div>
@@ -1535,37 +1323,84 @@ function KYCSection({
 
 // ─── Savings Programs Section ─────────────────────────────────────────────────
 function SavingsProgramsSection({
-  programs,
-  onAddProgram,
+  groups,
+  isLoading,
+  error,
+  onRetry,
 }: {
-  programs: SavingsProgram[];
-  onAddProgram: (p: SavingsProgram) => void;
+  groups: SavingsProgram[];
+  isLoading: boolean;
+  error: string | null;
+  onRetry: () => void;
 }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     name: "",
-    type: "Monthly",
+    frequency: "monthly",
     target: "",
+    contributionAmount: "",
+    maxMembers: "",
     desc: "",
+    startDate: "",
+    endDate: "",
+    visibility: "private",
   });
+  const createGroup = useCreateAdminSavingsGroup();
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.target) return;
-    const targetNum = Number(form.target.replace(/[^0-9]/g, "")) || 500000;
-    onAddProgram({
-      id: String(Date.now()),
-      name: form.name,
-      type: form.type,
-      members: 1,
-      target: targetNum,
-      collected: 0,
-      started: "Just now",
-      nextCycle: "Next month",
-      status: "active",
-    });
-    setForm({ name: "", type: "Monthly", target: "", desc: "" });
-    setShowForm(false);
+    const targetAmount = Number(form.target);
+    const contributionAmount = Number(form.contributionAmount);
+    const maxMembers = Number(form.maxMembers);
+    if (
+      !form.name.trim() ||
+      !form.startDate ||
+      !form.endDate ||
+      !Number.isFinite(targetAmount) ||
+      !Number.isFinite(contributionAmount) ||
+      !Number.isInteger(maxMembers) ||
+      targetAmount <= 0 ||
+      contributionAmount <= 0 ||
+      maxMembers <= 0
+    ) {
+      toast.error("Complete all required group fields with valid amounts and dates.");
+      return;
+    }
+
+    try {
+      await createGroup.mutateAsync({
+        name: form.name.trim(),
+        description: form.desc.trim(),
+        targetAmount,
+        contributionAmount,
+        currency: "NGN",
+        frequency: form.frequency,
+        maxMembers,
+        startDate: form.startDate,
+        endDate: form.endDate,
+        visibility: form.visibility,
+        image: "",
+      });
+      toast.success("Savings group created successfully");
+      setForm({
+        name: "",
+        frequency: "monthly",
+        target: "",
+        contributionAmount: "",
+        maxMembers: "",
+        desc: "",
+        startDate: "",
+        endDate: "",
+        visibility: "private",
+      });
+      setShowForm(false);
+    } catch (createError) {
+      toast.error(
+        createError instanceof Error
+          ? createError.message
+          : "Unable to create savings group",
+      );
+    }
   };
 
   return (
@@ -1627,11 +1462,11 @@ function SavingsProgramsSection({
                   Frequency
                 </label>
                 <select
-                  value={form.type}
-                  onChange={(e) => setForm({ ...form, type: e.target.value })}
+                  value={form.frequency}
+                  onChange={(e) => setForm({ ...form, frequency: e.target.value })}
                   className="w-full bg-[#F1F3FB] dark:bg-[#1E2140] rounded-xl px-4 py-3 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]"
                 >
-                  {["Daily", "Weekly", "Bi-weekly", "Monthly"].map((t) => (
+                  {["daily", "weekly", "monthly"].map((t) => (
                     <option key={t} value={t}>
                       {t}
                     </option>
@@ -1661,6 +1496,69 @@ function SavingsProgramsSection({
                   className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-3 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]"
                 />
               </div>
+              <div>
+                <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
+                  Contribution Amount (₦)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={form.contributionAmount}
+                  onChange={(e) => setForm({ ...form, contributionAmount: e.target.value })}
+                  required
+                  className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-3 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
+                  Maximum Members
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={form.maxMembers}
+                  onChange={(e) => setForm({ ...form, maxMembers: e.target.value })}
+                  required
+                  className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-3 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={form.startDate}
+                  onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                  required
+                  className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-3 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  value={form.endDate}
+                  onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+                  required
+                  className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-3 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
+                  Visibility
+                </label>
+                <select
+                  value={form.visibility}
+                  onChange={(e) => setForm({ ...form, visibility: e.target.value })}
+                  className="w-full bg-[#F1F3FB] dark:bg-[#1E2140] rounded-xl px-4 py-3 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]"
+                >
+                  <option value="private">Private</option>
+                  <option value="public">Public</option>
+                </select>
+              </div>
             </div>
             <div className="flex gap-3">
               <button
@@ -1672,17 +1570,28 @@ function SavingsProgramsSection({
               </button>
               <button
                 type="submit"
+                disabled={createGroup.isPending}
                 className="flex-1 py-2.5 bg-[#3730A3] hover:bg-[#312E81] text-white rounded-xl text-sm font-medium shadow-sm transition-colors"
               >
-                Create Program
+                {createGroup.isPending ? "Creating..." : "Create Program"}
               </button>
             </div>
           </motion.form>
         )}
       </AnimatePresence>
 
+      {isLoading ? (
+        <div className="rounded-2xl bg-white p-8 text-center text-sm text-[#9CA3AF] dark:bg-[#111327]">Loading savings groups...</div>
+      ) : error ? (
+        <div className="rounded-2xl bg-white p-8 text-center dark:bg-[#111327]">
+          <p role="alert" className="mb-3 text-sm text-red-600">{error}</p>
+          <button onClick={onRetry} className="font-semibold text-[#3730A3]">Retry</button>
+        </div>
+      ) : groups.length === 0 ? (
+        <div className="rounded-2xl bg-white p-8 text-center text-sm text-[#9CA3AF] dark:bg-[#111327]">No savings groups found.</div>
+      ) : (
       <div className="flex flex-col gap-4">
-        {programs.map((p) => (
+        {groups.map((p) => (
           <div
             key={p.id}
             className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm"
@@ -1761,6 +1670,7 @@ function SavingsProgramsSection({
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }
@@ -1768,11 +1678,24 @@ function SavingsProgramsSection({
 // ─── Wallets Section with Detailed Member Wallet Modal ────────────────────────
 function WalletsSection({
   members,
+  isLoading,
+  error,
+  onRetry,
   onSelectMember,
 }: {
   members: Member[];
+  isLoading: boolean;
+  error: string | null;
+  onRetry: () => void;
   onSelectMember: (m: Member) => void;
 }) {
+  const totalsQuery = useAdminDashboardTotals();
+  const totalWalletBalance = totalsQuery.data?.totalWalletBalance;
+  const averageBalance =
+    totalWalletBalance !== undefined && members.length > 0
+      ? totalWalletBalance / members.length
+      : undefined;
+
   return (
     <div>
       <PageHeader
@@ -1788,37 +1711,41 @@ function WalletsSection({
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         <StatCard
           label="Total Wallet Funds"
-          value="₦12.4M"
+          value={totalsQuery.isLoading ? "..." : totalWalletBalance === undefined ? "Unavailable" : fmt(totalWalletBalance)}
           sub="All members"
           icon={<Wallet size={20} />}
-          trend={22}
         />
         <StatCard
           label="Today's Credits"
-          value="₦840K"
-          sub="12 transactions"
+          value="Unavailable"
+          sub="No daily wallet-credit aggregate endpoint"
           icon={<ArrowDownLeft size={20} />}
-          trend={8}
           color="#059669"
           bg="#ECFDF5"
         />
         <StatCard
           label="Today's Debits"
-          value="₦320K"
-          sub="28 transactions"
+          value="Unavailable"
+          sub="No daily wallet-debit aggregate endpoint"
           icon={<ArrowUpRight size={20} />}
           color="#DC2626"
           bg="#FEF2F2"
         />
         <StatCard
           label="Avg. Balance"
-          value="₦221K"
-          sub="Per member"
+          value={averageBalance === undefined ? "Unavailable" : fmt(averageBalance)}
+          sub={averageBalance === undefined ? "Requires wallet totals and member count" : "Total wallet balance ÷ returned members"}
           icon={<DollarSign size={20} />}
           color="#7C3AED"
           bg="#F5F3FF"
         />
       </div>
+      {totalsQuery.isError && (
+        <QueryErrorNotice
+          error={totalsQuery.error}
+          onRetry={() => void totalsQuery.refetch()}
+        />
+      )}
       <div className="bg-white dark:bg-[#111327] rounded-2xl border border-[#F1F3FB] dark:border-white/10 overflow-hidden shadow-sm">
         <div className="p-4 border-b border-[#F1F3FB] dark:border-white/10 flex items-center justify-between">
           <div>
@@ -1833,7 +1760,7 @@ function WalletsSection({
               Member Wallet Balances
             </h3>
             <p className="text-xs text-[#9CA3AF] mt-0.5">
-              Click any member to inspect detailed account ledger & statements
+              Click any user to inspect documented account details and transaction history
             </p>
           </div>
         </div>
@@ -1859,7 +1786,15 @@ function WalletsSection({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F9FAFB] dark:divide-white/5">
-              {members.map((m) => (
+              {isLoading ? (
+                <tr><td colSpan={6} className="p-8 text-center text-sm text-[#9CA3AF]">Loading wallet users...</td></tr>
+              ) : error ? (
+                <tr><td colSpan={6} className="p-8 text-center text-sm text-red-600">
+                  {error} <button onClick={onRetry} className="ml-2 font-semibold text-[#3730A3]">Retry</button>
+                </td></tr>
+              ) : members.length === 0 ? (
+                <tr><td colSpan={6} className="p-8 text-center text-sm text-[#9CA3AF]">No wallet users found.</td></tr>
+              ) : members.map((m) => (
                 <tr
                   key={m.id}
                   onClick={() => onSelectMember(m)}
@@ -1878,22 +1813,18 @@ function WalletsSection({
                           {m.name}
                         </div>
                         <div className="text-[11px] text-[#9CA3AF]">
-                          {m.accountNumber || "9928374610"}
+                          {m.accountNumber || "Not available"}
                         </div>
                       </div>
                     </div>
                   </td>
                   <td className="px-4 py-3.5 font-semibold text-sm text-[#0D0F1C] dark:text-[#F0F2FF]">
-                    {fmt(m.wallet)}
+                    {m.wallet === undefined ? "—" : fmt(m.wallet)}
                   </td>
-                  <td className="px-4 py-3.5 text-sm font-medium text-[#059669]">
-                    +{fmt(Math.round(m.wallet * 0.4))}
-                  </td>
-                  <td className="px-4 py-3.5 text-sm font-medium text-[#DC2626]">
-                    -{fmt(Math.round(m.wallet * 0.15))}
-                  </td>
+                  <td className="px-4 py-3.5 text-sm font-medium text-[#9CA3AF]">—</td>
+                  <td className="px-4 py-3.5 text-sm font-medium text-[#9CA3AF]">—</td>
                   <td className="px-4 py-3.5 text-xs text-[#9CA3AF]">
-                    Jun 14, 2024
+                    Not available from the user-role API
                   </td>
                   <td className="px-4 py-3.5 text-right">
                     <span className="text-xs font-semibold text-[#3730A3] dark:text-[#818CF8] group-hover:underline">
@@ -1936,7 +1867,14 @@ function AdminTransactionsSection() {
               : transaction.userId._id;
           return transactionUserId === selectedUserId;
         });
-  const searchedTransactions = searchQuery.data || [];
+  const searchData = searchQuery.data;
+  const searchedTransactions = Array.isArray(searchData)
+    ? searchData.filter(isAdminTransaction)
+    : [];
+  const hasUnsupportedSearchResults =
+    searchData !== undefined &&
+    (!Array.isArray(searchData) ||
+      searchedTransactions.length !== searchData.length);
 
   const getUser = (
     transactionUserId: string | AdminTransactionUser,
@@ -2010,13 +1948,15 @@ function AdminTransactionsSection() {
           value={
             transactionsQuery.isLoading
               ? "..."
-              : String(transactionsQuery.data?.totalTransactions ?? 0)
+              : transactionsQuery.isError
+                ? "Unavailable"
+                : String(transactionsQuery.data?.totalTransactions ?? 0)
           }
           icon={<TransactionsIcon size={20} />}
         />
         <StatCard
           label="Users"
-          value={usersQuery.isLoading ? "..." : String(users.length)}
+          value={usersQuery.isLoading ? "..." : usersQuery.isError ? "Unavailable" : String(users.length)}
           icon={<Users size={20} />}
           color="#7C3AED"
           bg="#F5F3FF"
@@ -2026,6 +1966,8 @@ function AdminTransactionsSection() {
           value={
             usersQuery.isLoading
               ? "..."
+              : usersQuery.isError
+                ? "Unavailable"
               : String(users.filter((user) => user.isBlocked).length)
           }
           icon={<Shield size={20} />}
@@ -2083,12 +2025,17 @@ function AdminTransactionsSection() {
               : "Unable to search transactions"}
           </p>
         )}
+        {searchedMeterNumber && !searchQuery.isLoading && !searchQuery.isError && hasUnsupportedSearchResults && (
+          <p role="alert" className="mt-3 text-sm text-amber-700">
+            Search completed, but the Postman collection does not document this endpoint&apos;s response shape, so the result cannot be safely displayed.
+          </p>
+        )}
         {searchedMeterNumber && !searchQuery.isLoading && !searchQuery.isError && (
           <div className="mt-4 overflow-x-auto">
             <h3 className="mb-2 text-sm font-semibold">
               Search results ({searchedTransactions.length})
             </h3>
-            {searchedTransactions.length ? (
+            {hasUnsupportedSearchResults ? null : searchedTransactions.length ? (
               <table className="w-full min-w-[750px] text-left">
                 <thead className="text-xs uppercase text-[#9CA3AF]">
                   <tr>
@@ -2119,7 +2066,9 @@ function AdminTransactionsSection() {
               All Transactions
             </h2>
             <p className="mt-1 text-xs text-[#9CA3AF]">
-              {transactionsQuery.data?.totalTransactions ?? 0} transactions
+              {transactionsQuery.isError
+                ? "Transaction count unavailable"
+                : `${transactionsQuery.data?.totalTransactions ?? 0} transactions`}
             </p>
           </div>
           <label className="flex items-center gap-2 text-sm">
@@ -2259,714 +2208,72 @@ function AdminTransactionsSection() {
 }
 
 // ─── Marketplace Section with Detailed Product Modal ─────────────────────────
-function MarketplaceSection({
-  products,
-  onAddProduct,
-  onDeleteProduct,
-  onSelectProduct,
-}: {
-  products: Product[];
-  onAddProduct: (p: Product) => void;
-  onDeleteProduct: (p: Product) => void;
-  onSelectProduct: (p: Product) => void;
-}) {
-  const [uiMode, setUiMode] = useState<"classic" | "coop">(() => {
-    return (
-      (localStorage.getItem("pave_marketplace_add_ui_mode") as
-        | "classic"
-        | "coop") || "coop"
-    );
-  });
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    category: "Electronics",
-    price: "",
-    stock: "",
-  });
-
-  const handleSelectUiMode = (mode: "classic" | "coop") => {
-    setUiMode(mode);
-    localStorage.setItem("pave_marketplace_add_ui_mode", mode);
-    setShowForm(true);
-  };
-
-  const handleAdd = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.name || !form.price) return;
-    const priceNum = Number(form.price.replace(/[^0-9]/g, "")) || 100000;
-    const stockNum = Number(form.stock) || 10;
-    onAddProduct({
-      id: String(Date.now()),
-      name: form.name,
-      category: form.category,
-      price: priceNum,
-      stock: stockNum,
-      sales: 0,
-      image:
-        "https://images.unsplash.com/photo-1593359677879-a4bb92f4834d?w=400&h=400&fit=crop",
-      status: stockNum > 0 ? "active" : "out_of_stock",
-      description:
-        "Brand new item available with standard 50% down payment plan.",
-      specs: ["1 Year Official Warranty", "Express Hub Pickup"],
-    });
-    setForm({ name: "", category: "Electronics", price: "", stock: "" });
-    setShowForm(false);
-  };
-
-  return (
-    <div>
-      <PageHeader
-        title="Marketplace"
-        subtitle="Manage products and installment listings"
-        action={
-          <div className="flex items-center gap-2.5 flex-wrap">
-            {/* UI Mode Selector - without 'Add UI:' label */}
-            <div className="bg-[#F1F3FB] dark:bg-white/5 p-1 rounded-xl flex items-center gap-1 border border-[#E5E7EB] dark:border-white/10 text-xs">
-              <button
-                type="button"
-                onClick={() => handleSelectUiMode("classic")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                  uiMode === "classic"
-                    ? "bg-white dark:bg-[#3730A3] text-[#3730A3] dark:text-white shadow-sm font-semibold"
-                    : "text-[#6B7280] dark:text-[#94A3B8] hover:text-[#0D0F1C] dark:hover:text-white"
-                }`}
-                title="Use Classic Add Product form"
-              >
-                Classic Form
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSelectUiMode("coop")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all ${
-                  uiMode === "coop"
-                    ? "bg-[#3730A3] text-white shadow-sm font-semibold"
-                    : "text-[#6B7280] dark:text-[#94A3B8] hover:text-[#0D0F1C] dark:hover:text-white"
-                }`}
-                title="Use new Shop Product form"
-              >
-                <Sparkles
-                  size={12}
-                  className={uiMode === "coop" ? "text-amber-300" : ""}
-                />
-                Shop Product (New)
-              </button>
-            </div>
-
-            <button
-              onClick={() => setShowForm(!showForm)}
-              className="px-4 py-2 bg-[#3730A3] hover:bg-[#312E81] text-white rounded-xl text-sm font-medium flex items-center gap-2 transition-colors shadow-sm"
-            >
-              <Plus size={16} />
-              Add Product
-            </button>
-          </div>
-        }
-      />
-
-      <AnimatePresence mode="wait">
-        {showForm &&
-          (uiMode === "coop" ? (
-            <ShopProductForm
-              key="shop-product-form"
-              onAddProduct={onAddProduct}
-              onClose={() => setShowForm(false)}
-              onSwitchToClassic={() => {
-                setUiMode("classic");
-                localStorage.setItem("pave_marketplace_add_ui_mode", "classic");
-              }}
-            />
-          ) : (
-            <motion.form
-              key="classic-product-form"
-              onSubmit={handleAdd}
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="bg-white dark:bg-[#111327] rounded-2xl p-6 border border-[#F1F3FB] dark:border-white/10 mb-5 shadow-md"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <h3
-                    style={{
-                      fontFamily:
-                        "var(--font-family-display, 'Bricolage Grotesque')",
-                      fontWeight: 700,
-                      fontSize: 16,
-                    }}
-                    className="text-[#0D0F1C] dark:text-[#F0F2FF]"
-                  >
-                    Add New Product (Classic UI)
-                  </h3>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUiMode("coop");
-                      localStorage.setItem(
-                        "pave_marketplace_add_ui_mode",
-                        "coop"
-                      );
-                    }}
-                    className="px-2.5 py-1 bg-[#EEF2FF] dark:bg-white/10 hover:bg-[#E0E7FF] text-[#3730A3] dark:text-[#818CF8] rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
-                    title="Switch to the new Shop Product form"
-                  >
-                    <Sparkles size={12} />
-                    Switch to Shop Product (New)
-                  </button>
-                  <button type="button" onClick={() => setShowForm(false)}>
-                    <X size={18} className="text-[#9CA3AF]" />
-                  </button>
-                </div>
-              </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-              <div className="sm:col-span-2">
-                <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
-                  Product Name
-                </label>
-                <input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="e.g. Samsung Galaxy S25"
-                  required
-                  className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-3 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
-                  Category
-                </label>
-                <select
-                  value={form.category}
-                  onChange={(e) =>
-                    setForm({ ...form, category: e.target.value })
-                  }
-                  className="w-full bg-[#F1F3FB] dark:bg-[#1E2140] rounded-xl px-4 py-3 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]"
-                >
-                  {["Electronics", "Fashion", "Home", "Kitchen"].map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
-                  Price (₦)
-                </label>
-                <input
-                  value={form.price}
-                  onChange={(e) => setForm({ ...form, price: e.target.value })}
-                  placeholder="850000"
-                  required
-                  className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-3 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
-                  Stock Quantity
-                </label>
-                <input
-                  value={form.stock}
-                  onChange={(e) => setForm({ ...form, stock: e.target.value })}
-                  placeholder="15"
-                  required
-                  className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-3 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
-                  Product Image
-                </label>
-                <button
-                  type="button"
-                  className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl py-3 text-sm text-[#9CA3AF] flex items-center justify-center gap-2 hover:bg-[#EEF2FF] dark:hover:bg-white/10 transition-colors"
-                >
-                  <Upload size={16} />
-                  Upload Image
-                </button>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="flex-1 py-2.5 border-2 border-[#E5E7EB] dark:border-white/10 rounded-xl text-sm font-medium text-[#374151] dark:text-gray-300 hover:bg-[#F9FAFB]"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="flex-1 py-2.5 bg-[#3730A3] hover:bg-[#312E81] text-white rounded-xl text-sm font-medium transition-colors shadow-sm"
-              >
-                Publish Product
-              </button>
-            </div>
-          </motion.form>
-        ))}
-      </AnimatePresence>
-
-      <div className="bg-white dark:bg-[#111327] rounded-2xl border border-[#F1F3FB] dark:border-white/10 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px]">
-            <thead className="bg-[#F9FAFB] dark:bg-white/5 border-b border-[#F1F3FB] dark:border-white/10">
-              <tr>
-                {[
-                  "Product",
-                  "Category",
-                  "Price",
-                  "50% Down",
-                  "Stock",
-                  "Sales",
-                  "Status",
-                  "",
-                ].map((h) => (
-                  <th
-                    key={h}
-                    className="text-left px-4 py-3 text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#F9FAFB] dark:divide-white/5">
-              {products.map((p) => (
-                <tr
-                  key={p.id}
-                  onClick={() => onSelectProduct(p)}
-                  className="hover:bg-[#F9FAFB] dark:hover:bg-white/5 cursor-pointer transition-colors group"
-                >
-                  <td className="px-4 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <ImageWithFallback
-                        src={p.image}
-                        alt={p.name}
-                        className="w-10 h-10 rounded-xl object-cover bg-[#F1F3FB] dark:bg-white/5 flex-shrink-0"
-                      />
-                      <span className="text-sm font-medium text-[#0D0F1C] dark:text-[#F0F2FF] group-hover:text-[#3730A3] dark:group-hover:text-[#818CF8] transition-colors">
-                        {p.name}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <Badge color="gray">{p.category}</Badge>
-                  </td>
-                  <td className="px-4 py-3.5 text-sm font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
-                    {fmt(p.price)}
-                  </td>
-                  <td className="px-4 py-3.5 text-sm font-semibold text-[#7C3AED]">
-                    {fmt(p.price / 2)}
-                  </td>
-                  <td className="px-4 py-3.5 text-sm text-[#0D0F1C] dark:text-[#F0F2FF]">
-                    {p.stock}
-                  </td>
-                  <td className="px-4 py-3.5 text-sm text-[#0D0F1C] dark:text-[#F0F2FF]">
-                    {p.sales}
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <Badge color={p.status === "active" ? "green" : "red"}>
-                      {p.status === "active" ? "Active" : "Out of Stock"}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3.5 text-right">
-                    <div
-                      className="flex items-center justify-end gap-2"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        onClick={() => onSelectProduct(p)}
-                        className="w-7 h-7 rounded-lg bg-[#EEF2FF] dark:bg-[#818CF8]/20 flex items-center justify-center text-[#3730A3] dark:text-[#818CF8] hover:opacity-90 transition-colors"
-                        title="Edit product details"
-                        aria-label="Edit product details"
-                      >
-                        <Edit2 size={13} />
-                      </button>
-                      <button
-                        onClick={() => onDeleteProduct(p)}
-                        className="w-7 h-7 rounded-lg bg-[#FEF2F2] dark:bg-[#EF4444]/20 flex items-center justify-center text-[#DC2626] dark:text-[#EF4444] hover:opacity-90 transition-colors"
-                        title="Delete product"
-                        aria-label="Delete product"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+function MarketplaceSection() {
+  return <div>
+    <PageHeader title="Marketplace" subtitle="Manage products and installment listings" action={<button disabled title="Marketplace API is not available" className="px-4 py-2 bg-[#3730A3] text-white rounded-xl text-sm font-medium flex items-center gap-2 opacity-50 cursor-not-allowed"><Plus size={16} />Add Product unavailable</button>} />
+    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Product listing, inventory, and order-management endpoints are not present in the documented API collection.</div>
+    <div className="bg-white dark:bg-[#111327] rounded-2xl border border-[#F1F3FB] dark:border-white/10 overflow-hidden shadow-sm">
+      <div className="overflow-x-auto"><table className="w-full min-w-[700px]">
+        <thead className="bg-[#F9FAFB] dark:bg-white/5"><tr>{["Product", "Category", "Price", "Installment", "Stock", "Sales", "Status", ""].map((heading) => <th key={heading} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#9CA3AF]">{heading}</th>)}</tr></thead>
+        <tbody><tr><td colSpan={8} className="p-10 text-center text-sm text-[#9CA3AF]">No marketplace data available. A documented marketplace API is required to load products.</td></tr></tbody>
+      </table></div>
     </div>
-  );
+  </div>;
 }
-
-// ─── Messaging Section ────────────────────────────────────────────────────────
 function MessagingSection() {
   const [tab, setTab] = useState<"inbox" | "broadcast">("inbox");
-  const [msg, setMsg] = useState("");
-  const [subject, setSubject] = useState("");
-  const [sent, setSent] = useState(false);
-  const [activeChat, setActiveChat] = useState<Conversation | null>(null);
-
-  const conversations: Conversation[] = [
-    {
-      id: 1,
-      name: "Emeka Adeyemi",
-      lastMsg: "When is the next payout?",
-      time: "5m",
-      unread: 1,
-    },
-    {
-      id: 2,
-      name: "Chinwe Okonkwo",
-      lastMsg: "Thank you for approving my KYC!",
-      time: "1h",
-      unread: 0,
-    },
-    {
-      id: 3,
-      name: "Fatima Hassan",
-      lastMsg: "Can I change my savings frequency?",
-      time: "2h",
-      unread: 2,
-    },
-    {
-      id: 4,
-      name: "Oluwaseun Afolabi",
-      lastMsg: "Got it, thanks!",
-      time: "1d",
-      unread: 0,
-    },
-  ];
-
-  return (
-    <div>
-      <PageHeader
-        title="Messaging & Broadcasts"
-        subtitle="Communicate with your members"
-      />
-      <div className="bg-white dark:bg-[#111327] rounded-2xl overflow-hidden border border-[#F1F3FB] dark:border-white/10 shadow-sm">
-        <div className="flex border-b border-[#F1F3FB] dark:border-white/10">
-          {(["inbox", "broadcast"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`flex-1 py-3.5 text-sm font-semibold transition-all ${
-                tab === t
-                  ? "bg-[#3730A3] text-white"
-                  : "text-[#9CA3AF] hover:bg-[#F9FAFB] dark:hover:bg-white/5"
-              }`}
-            >
-              {t === "inbox" ? (
-                <>
-                  <MessageSquare size={15} className="inline mr-2" />
-                  Inbox
-                </>
-              ) : (
-                <>
-                  <Megaphone size={15} className="inline mr-2" />
-                  Broadcast
-                </>
-              )}
-            </button>
-          ))}
-        </div>
-        {tab === "inbox" ? (
-          <div className="divide-y divide-[#F9FAFB] dark:divide-white/5">
-            {conversations.map((c, i) => (
-              <button
-                key={i}
-                onClick={() => setActiveChat(c)}
-                className="w-full flex items-center gap-4 px-5 py-4 hover:bg-[#F9FAFB] dark:hover:bg-white/5 transition-colors text-left"
-              >
-                <div className="w-10 h-10 rounded-full bg-[#EEF2FF] dark:bg-[#818CF8]/20 flex items-center justify-center text-[#3730A3] dark:text-[#818CF8] text-sm font-bold flex-shrink-0">
-                  {c.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
-                      {c.name}
-                    </span>
-                    <span className="text-xs text-[#9CA3AF]">{c.time}</span>
-                  </div>
-                  <div className="text-sm text-[#9CA3AF] truncate mt-0.5">
-                    {c.lastMsg}
-                  </div>
-                </div>
-                {c.unread > 0 && (
-                  <div className="w-5 h-5 rounded-full bg-[#3730A3] text-white flex items-center justify-center flex-shrink-0 text-[11px] font-bold">
-                    {c.unread}
-                  </div>
-                )}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="p-5">
-            {!sent ? (
-              <div className="flex flex-col gap-4 max-w-2xl">
-                <div>
-                  <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
-                    Send To
-                  </label>
-                  <select className="w-full bg-[#F1F3FB] dark:bg-[#1E2140] rounded-xl px-4 py-3 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]">
-                    <option>All Members (56)</option>
-                    <option>Community Thrift Group (24)</option>
-                    <option>Staff Cooperative (18)</option>
-                    <option>Pending KYC Members (3)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
-                    Subject
-                  </label>
-                  <input
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    placeholder="e.g. Monthly Contribution Reminder"
-                    className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-3 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
-                    Message
-                  </label>
-                  <textarea
-                    value={msg}
-                    onChange={(e) => setMsg(e.target.value)}
-                    rows={6}
-                    placeholder="Type your broadcast message here..."
-                    className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-3 text-sm outline-none border border-transparent focus:border-[#3730A3] resize-none text-[#0D0F1C] dark:text-[#F0F2FF]"
-                  />
-                </div>
-                <div className="flex gap-3">
-                  <button className="px-5 py-2.5 border-2 border-[#E5E7EB] dark:border-white/10 rounded-xl text-sm font-medium hover:bg-[#F9FAFB] text-[#374151] dark:text-gray-300">
-                    Schedule
-                  </button>
-                  <button
-                    onClick={() => setSent(true)}
-                    disabled={!msg || !subject}
-                    className="px-6 py-2.5 bg-[#3730A3] text-white rounded-xl text-sm font-semibold flex items-center gap-2 hover:bg-[#312E81] transition-colors disabled:opacity-50 shadow-sm"
-                  >
-                    <Send size={15} />
-                    Send Broadcast
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex flex-col items-center py-12 gap-4"
-              >
-                <div className="w-16 h-16 bg-[#ECFDF5] dark:bg-[#10B981]/20 rounded-full flex items-center justify-center">
-                  <CheckCircle size={36} className="text-[#059669]" />
-                </div>
-                <div className="text-center">
-                  <div className="font-bold text-lg text-[#0D0F1C] dark:text-[#F0F2FF]">
-                    Broadcast Sent!
-                  </div>
-                  <div className="text-sm text-[#9CA3AF]">
-                    Your message has been delivered to all selected members.
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setSent(false);
-                    setMsg("");
-                    setSubject("");
-                  }}
-                  className="px-5 py-2.5 bg-[#3730A3] hover:bg-[#312E81] text-white rounded-xl text-sm font-medium transition-colors"
-                >
-                  Send Another
-                </button>
-              </motion.div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Full Screen Chat */}
-      <AnimatePresence>
-        {activeChat && (
-          <FullScreenChat
-            conversation={activeChat}
-            onClose={() => setActiveChat(null)}
-          />
-        )}
-      </AnimatePresence>
+  return <div>
+    <PageHeader title="Messaging & Broadcasts" subtitle="Communicate with your members" />
+    <div className="bg-white dark:bg-[#111327] rounded-2xl overflow-hidden border border-[#F1F3FB] dark:border-white/10 shadow-sm">
+      <div className="flex border-b border-[#F1F3FB] dark:border-white/10">{(["inbox", "broadcast"] as const).map((item) => <button key={item} onClick={() => setTab(item)} className={`flex-1 py-3.5 text-sm font-semibold ${tab === item ? "bg-[#3730A3] text-white" : "text-[#9CA3AF] hover:bg-[#F9FAFB] dark:hover:bg-white/5"}`}>{item === "inbox" ? <><MessageSquare size={15} className="inline mr-2" />Inbox</> : <><Megaphone size={15} className="inline mr-2" />Broadcast</>}</button>)}</div>
+      {tab === "inbox" ? <div className="p-12 text-center text-sm text-[#9CA3AF]">Messaging is unavailable because the documented API collection has no inbox or messaging endpoints.</div> : <div className="p-5"><div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Broadcast delivery is unavailable because the documented API collection has no broadcast endpoint.</div><div className="flex max-w-2xl flex-col gap-4"><label className="text-xs font-medium">Send To<select disabled className="mt-1.5 w-full rounded-xl bg-[#F1F3FB] px-4 py-3 text-sm"><option>Recipients unavailable</option></select></label><label className="text-xs font-medium">Subject<input disabled placeholder="Subject" className="mt-1.5 w-full rounded-xl bg-[#F1F3FB] px-4 py-3 text-sm" /></label><label className="text-xs font-medium">Message<textarea disabled rows={6} placeholder="Broadcast message" className="mt-1.5 w-full resize-none rounded-xl bg-[#F1F3FB] px-4 py-3 text-sm" /></label><div className="flex gap-3"><button disabled className="rounded-xl border-2 border-[#E5E7EB] px-5 py-2.5 text-sm opacity-50">Schedule unavailable</button><button disabled className="flex items-center gap-2 rounded-xl bg-[#3730A3] px-6 py-2.5 text-sm font-semibold text-white opacity-50"><Send size={15} />Send unavailable</button></div></div></div>}
     </div>
-  );
+  </div>;
 }
-
-// ─── Reports Section ──────────────────────────────────────────────────────────
 function ReportsSection() {
-  return (
-    <div>
-      <PageHeader
-        title="Reports & Analytics"
-        subtitle="Insights across your platform"
-        action={
-          <button className="px-4 py-2 bg-[#059669] text-white rounded-xl text-sm font-semibold flex items-center gap-2 hover:bg-[#047857] transition-colors shadow-sm">
-            <Download size={16} />
-            Export Report
-          </button>
-        }
-      />
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <StatCard
-          label="Total Revenue"
-          value="₦24.6M"
-          sub="All time"
-          icon={<DollarSign size={20} />}
-          trend={31}
-        />
-        <StatCard
-          label="Active Members"
-          value="52"
-          sub="93% of total"
-          icon={<Users size={20} />}
-          trend={14}
-          color="#059669"
-          bg="#ECFDF5"
-        />
-        <StatCard
-          label="Savings Goals"
-          value="142"
-          sub="Active goals"
-          icon={<Target size={20} />}
-          trend={22}
-          color="#D97706"
-          bg="#FFFBEB"
-        />
-        <StatCard
-          label="Marketplace Sales"
-          value="33"
-          sub="₦6.1M in orders"
-          icon={<ShoppingBag size={20} />}
-          trend={45}
-          color="#7C3AED"
-          bg="#F5F3FF"
-        />
-      </div>
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
-          <h3
-            style={{
-              fontFamily: "var(--font-family-display, 'Bricolage Grotesque')",
-              fontWeight: 700,
-              fontSize: 16,
-            }}
-            className="mb-4 text-[#0D0F1C] dark:text-[#F0F2FF]"
-          >
-            Monthly Revenue
-          </h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={REVENUE_DATA}>
-              <XAxis
-                dataKey="month"
-                tick={{ fontSize: 11, fill: "#9CA3AF" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 10, fill: "#9CA3AF" }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v) => `₦${v / 1000000}M`}
-              />
-              <Tooltip
-                formatter={(v: unknown) => `₦${Number(v).toLocaleString()}`}
-                contentStyle={{
-                  borderRadius: 12,
-                  border: "none",
-                  fontSize: 12,
-                }}
-              />
-              <Bar dataKey="wallet" stackId="a" fill="#3730A3" name="Wallet" />
-              <Bar
-                dataKey="savings"
-                stackId="a"
-                fill="#059669"
-                name="Savings"
-              />
-              <Bar
-                dataKey="marketplace"
-                stackId="a"
-                fill="#D97706"
-                radius={[6, 6, 0, 0]}
-                name="Marketplace"
-              />
-              <Legend />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
-          <h3
-            style={{
-              fontFamily: "var(--font-family-display, 'Bricolage Grotesque')",
-              fontWeight: 700,
-              fontSize: 16,
-            }}
-            className="mb-4 text-[#0D0F1C] dark:text-[#F0F2FF]"
-          >
-            Member Growth
-          </h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={MEMBER_GROWTH}>
-              <XAxis
-                dataKey="month"
-                tick={{ fontSize: 11, fill: "#9CA3AF" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 10, fill: "#9CA3AF" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip
-                contentStyle={{
-                  borderRadius: 12,
-                  border: "none",
-                  fontSize: 12,
-                }}
-              />
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="#F1F3FB"
-                vertical={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="members"
-                stroke="#3730A3"
-                strokeWidth={3}
-                dot={{ fill: "#3730A3", r: 5 }}
-                activeDot={{ r: 7 }}
-                name="Members"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-    </div>
-  );
-}
+  const memberCount = useAdminTotalMembers();
+  const userStats = useAdminUserStatistics();
+  const retention = useAdminRetentionStatistics();
+  const yearly = useAdminYearlyVending();
+  const vending = useAdminVendingGraph();
+  const registrations = useAdminDailyRegistrations();
+  const cohorts = useAdminCohortAnalysis();
+  const leaderboard = useAdminLeaderboard();
+  const health = useAdminSystemHealth();
+  const groups = useAdminSavingsGroups();
+  const monthly = vending.data?.monthly ?? [];
+  const topUsers = leaderboard.data?.leaderboards.topByAmount ?? [];
+  const retryNotice = (query: { isLoading: boolean; isError: boolean; error: Error | null; refetch: () => Promise<unknown> }, empty: boolean, label: string) => query.isLoading ? <p className="py-10 text-center text-sm text-[#9CA3AF]">Loading {label}...</p> : query.isError ? <div role="alert" className="py-8 text-center text-sm text-red-600">{query.error?.message}<button onClick={() => void query.refetch()} className="ml-2 font-semibold">Retry</button></div> : empty ? <p className="py-10 text-center text-sm text-[#9CA3AF]">No {label} found.</p> : null;
+  const healthFields = (values: Record<string, unknown>) => Object.entries(values).filter(([, value]) => ["string", "number", "boolean"].includes(typeof value));
 
-// ─── Settings Section ─────────────────────────────────────────────────────────
+  return <div>
+    <PageHeader title="Reports & Analytics" subtitle="Insights from documented platform analytics" action={<button disabled title="A report export endpoint is not available in the documented API" className="px-4 py-2 bg-[#059669] text-white rounded-xl text-sm font-semibold opacity-50 cursor-not-allowed"><Download size={16} /> Export unavailable</button>} />
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+      <StatCard label="Total Members" value={memberCount.isLoading ? "..." : memberCount.data === undefined ? "Unavailable" : memberCount.data.toLocaleString()} sub="Admin member count" icon={<Users size={20} />} />
+      <StatCard label="Active Users (24h)" value={userStats.isLoading ? "..." : userStats.data?.activeUsersLast24Hours.toLocaleString() ?? "Unavailable"} sub="Admin user statistics" icon={<Users size={20} />} color="#059669" bg="#ECFDF5" />
+      <StatCard label="Yearly Vending Amount" value={yearly.isLoading ? "..." : yearly.data ? fmt(yearly.data.summary.totalAmount) : "Unavailable"} sub={yearly.data ? `${yearly.data.summary.count} transactions` : "Vending summary"} icon={<DollarSign size={20} />} color="#D97706" bg="#FFFBEB" />
+      <StatCard label="Retention Rate" value={retention.isLoading ? "..." : retention.data ? `${retention.data.retentionRate}%` : "Unavailable"} sub="Admin retention statistics" icon={<TrendingUp size={20} />} color="#7C3AED" bg="#F5F3FF" />
+    </div>
+    {memberCount.isError && <QueryErrorNotice error={memberCount.error} onRetry={() => void memberCount.refetch()} />}
+    {userStats.isError && <QueryErrorNotice error={userStats.error} onRetry={() => void userStats.refetch()} />}
+    {retention.isError && <QueryErrorNotice error={retention.error} onRetry={() => void retention.refetch()} />}
+    {yearly.isError && <QueryErrorNotice error={yearly.error} onRetry={() => void yearly.refetch()} />}
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <section className="rounded-2xl bg-white dark:bg-[#111327] p-5 shadow-sm"><h3 className="mb-4 font-bold">Monthly Vending Activity</h3>{retryNotice(vending, !monthly.length, "monthly vending data") ?? <ResponsiveContainer width="100%" height={200}><BarChart data={monthly}><XAxis dataKey="month" /><YAxis /><Tooltip formatter={(v: unknown) => fmt(Number(v))} /><CartesianGrid strokeDasharray="3 3" vertical={false} /><Bar dataKey="totalAmount" fill="#3730A3" name="Vending amount" /></BarChart></ResponsiveContainer>}</section>
+      <section className="rounded-2xl bg-white dark:bg-[#111327] p-5 shadow-sm"><h3 className="mb-4 font-bold">Daily Registrations</h3>{retryNotice(registrations, !registrations.data?.length, "registration data") ?? <ResponsiveContainer width="100%" height={200}><LineChart data={registrations.data}><XAxis dataKey="date" /><YAxis /><Tooltip /><CartesianGrid strokeDasharray="3 3" vertical={false} /><Line type="monotone" dataKey="registrations" stroke="#3730A3" strokeWidth={3} name="Registrations" /></LineChart></ResponsiveContainer>}</section>
+    </div>
+    <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <section className="rounded-2xl border border-[#F1F3FB] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111327]"><h3 className="mb-4 font-bold">Cohort Analysis</h3>{cohorts.isLoading ? <p className="text-sm text-[#9CA3AF]">Loading cohorts...</p> : cohorts.isError ? <div role="alert" className="text-sm text-red-600">{cohorts.error.message}<button onClick={() => void cohorts.refetch()} className="ml-2 font-semibold">Retry</button></div> : !cohorts.data?.length ? <p className="text-sm text-[#9CA3AF]">No cohort data found.</p> : <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="text-xs uppercase text-[#9CA3AF]"><tr><th className="py-2">Cohort</th><th className="py-2">Registered</th><th className="py-2">Active</th></tr></thead><tbody>{cohorts.data.map((row) => <tr key={row.cohort}><td className="py-2">{row.cohort}</td><td className="py-2">{row.totalRegistered}</td><td className="py-2">{row.activeUsersInCohort}</td></tr>)}</tbody></table></div>}</section>
+      <section className="rounded-2xl border border-[#F1F3FB] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111327]"><h3 className="mb-4 font-bold">Top Users by Vending Amount</h3>{leaderboard.isLoading ? <p className="text-sm text-[#9CA3AF]">Loading leaderboard...</p> : leaderboard.isError ? <div role="alert" className="text-sm text-red-600">{leaderboard.error.message}<button onClick={() => void leaderboard.refetch()} className="ml-2 font-semibold">Retry</button></div> : !topUsers.length ? <p className="text-sm text-[#9CA3AF]">No leaderboard users found.</p> : topUsers.map((row) => <div key={row.userId} className="flex justify-between gap-3 border-b border-[#F1F3FB] py-2 text-sm dark:border-white/10"><div><div className="font-semibold">{row.fullName}</div><div className="text-xs text-[#9CA3AF]">{row.email}</div></div><div className="text-right"><div>{fmt(row.totalAmount)}</div><div className="text-xs text-[#9CA3AF]">{row.transactionCount} transactions</div></div></div>)}</section>
+    </div>
+    <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">{(["system", "revenue", "performance"] as const).map((category) => { const values = health.data?.[category]; return <section key={category} className="rounded-2xl border border-[#F1F3FB] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111327]"><h3 className="mb-3 font-bold capitalize">{category} Health</h3>{health.isLoading ? <p className="text-sm text-[#9CA3AF]">Loading...</p> : health.isError ? <div role="alert" className="text-sm text-red-600">{health.error.message}<button onClick={() => void health.refetch()} className="ml-2 font-semibold">Retry</button></div> : values && healthFields(values).length ? healthFields(values).map(([key, value]) => <div key={key} className="flex justify-between border-b border-[#F1F3FB] py-1.5 text-xs dark:border-white/10"><span className="text-[#9CA3AF]">{key}</span><span>{String(value)}</span></div>) : <p className="text-sm text-[#9CA3AF]">No summary fields provided.</p>}</section>; })}</div>
+    {groups.isLoading ? <p className="mt-4 text-sm text-[#9CA3AF]">Loading savings group count...</p> : groups.isError ? <p role="alert" className="mt-4 text-sm text-red-600">Savings groups: {groups.error.message}<button onClick={() => void groups.refetch()} className="ml-2 font-semibold">Retry</button></p> : <p className="mt-4 text-sm text-[#6B7280] dark:text-[#94A3B8]">Savings groups: {groups.data?.length ?? 0} returned by the savings-groups API.</p>}
+  </div>;
+}
 function SettingsSection() {
   const { admin } = useAuth();
   const canManageAdmins = admin?.role === "super_admin";
-  const [emailNotif, setEmailNotif] = useState(true);
-  const [smsNotif, setSmsNotif] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const rolesQuery = useAdminUserRoles(canManageAdmins);
   const [adminForm, setAdminForm] = useState({
     firstName: "",
     lastName: "",
@@ -2978,11 +2285,6 @@ function SettingsSection() {
     role: "admin" as "admin" | "superadmin",
   });
   const createAdminAccount = useCreateAdminAccount();
-
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
-  };
 
   const handleAdminFormChange = (
     event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -3019,14 +2321,12 @@ function SettingsSection() {
     }
   };
 
-  const notificationToggles: Array<{
-    label: string;
-    value: boolean;
-    setter: (v: boolean) => void;
-  }> = [
-    { label: "Email Notifications", value: emailNotif, setter: setEmailNotif },
-    { label: "SMS Alerts", value: smsNotif, setter: setSmsNotif },
-  ];
+  const adminName = admin?.name || "Not available";
+  const adminInitials = adminName
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2);
 
   return (
     <div>
@@ -3048,44 +2348,35 @@ function SettingsSection() {
           </h3>
           <div className="flex items-center gap-4 mb-5 p-4 bg-[#F9FAFB] dark:bg-white/5 rounded-xl">
             <div className="w-14 h-14 rounded-full bg-[#EEF2FF] dark:bg-[#818CF8]/20 flex items-center justify-center text-[#3730A3] dark:text-[#818CF8] text-xl font-bold">
-              BO
+              {adminInitials}
             </div>
             <div>
               <div className="font-bold text-[#0D0F1C] dark:text-[#F0F2FF]">
-                Benjamin Okonkwo
+                {adminName}
               </div>
-              <div className="text-sm text-[#9CA3AF]">benjamin@pave.com</div>
-              <Badge color="indigo">Super Admin</Badge>
+              <div className="text-sm text-[#9CA3AF]">{admin?.email || "Not available"}</div>
+              <Badge color="indigo">{admin?.role || "Role unavailable"}</Badge>
             </div>
           </div>
           <div className="flex flex-col gap-3">
-            {[
-              ["Organization Name", "Okonkwo Community Group"],
-              ["Phone Number", "+234 803 123 4567"],
-              ["Timezone", "Africa/Lagos"],
-            ].map(([k, v]) => (
+            {["Organization Name", "Phone Number", "Timezone"].map((k) => (
               <div key={k}>
                 <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1">
                   {k}
                 </label>
                 <input
-                  defaultValue={v}
-                  className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-3 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]"
+                  value="Not available"
+                  disabled
+                  className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-3 text-sm outline-none border border-transparent text-[#9CA3AF]"
                 />
               </div>
             ))}
             <button
-              onClick={handleSave}
-              className="py-2.5 bg-[#3730A3] hover:bg-[#312E81] text-white rounded-xl text-sm font-semibold transition-colors mt-2 shadow-sm flex items-center justify-center gap-2"
+              disabled
+              title="Admin profile updates are not available in the documented API"
+              className="py-2.5 bg-[#3730A3] text-white rounded-xl text-sm font-semibold mt-2 shadow-sm flex items-center justify-center gap-2 opacity-50 cursor-not-allowed"
             >
-              {saved ? (
-                <>
-                  <Check size={16} />
-                  Saved Successfully!
-                </>
-              ) : (
-                "Save Changes"
-              )}
+              Save Changes unavailable
             </button>
           </div>
         </div>
@@ -3165,24 +2456,9 @@ function SettingsSection() {
             >
               Notifications
             </h3>
-            {notificationToggles.map((item) => (
-              <div
-                key={item.label}
-                className="flex items-center justify-between py-3 border-b border-[#F9FAFB] dark:border-white/5 last:border-0"
-              >
-                <span className="text-sm font-medium text-[#0D0F1C] dark:text-[#F0F2FF]">
-                  {item.label}
-                </span>
-                <button
-                  onClick={() => item.setter(!item.value)}
-                  className={`relative w-11 h-6 rounded-full transition-colors ${item.value ? "bg-[#3730A3]" : "bg-[#D1D5DB] dark:bg-gray-700"}`}
-                >
-                  <div
-                    className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${item.value ? "translate-x-6" : "translate-x-1"}`}
-                  />
-                </button>
-              </div>
-            ))}
+            <p className="text-sm text-[#9CA3AF]">
+              Notification preferences are not available in the documented API.
+            </p>
           </div>
           <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
             <h3
@@ -3195,7 +2471,16 @@ function SettingsSection() {
             >
               Role Management
             </h3>
-            {["Super Admin", "Admin", "Moderator", "Viewer"].map((r) => (
+            {rolesQuery.isLoading ? (
+              <p className="py-3 text-sm text-[#9CA3AF]">Loading admin roles...</p>
+            ) : rolesQuery.isError ? (
+              <div className="py-3 text-sm text-red-600">
+                <p>{rolesQuery.error.message}</p>
+                <button onClick={() => void rolesQuery.refetch()} className="mt-2 font-semibold text-[#3730A3]">Retry</button>
+              </div>
+            ) : Array.from(new Set((rolesQuery.data ?? []).map((user) => user.role))).length === 0 ? (
+              <p className="py-3 text-sm text-[#9CA3AF]">No user roles found.</p>
+            ) : Array.from(new Set((rolesQuery.data ?? []).map((user) => user.role))).map((r) => (
               <div
                 key={r}
                 className="flex items-center justify-between py-2.5 border-b border-[#F9FAFB] dark:border-white/5 last:border-0"
@@ -3204,11 +2489,11 @@ function SettingsSection() {
                   {r}
                 </span>
                 <div className="flex gap-1.5">
-                  <button className="text-xs px-2.5 py-1 bg-[#EEF2FF] dark:bg-[#818CF8]/20 text-[#3730A3] dark:text-[#818CF8] rounded-lg font-medium hover:opacity-90">
-                    Permissions
+                  <button disabled title="Role permissions are not available in the documented API" className="text-xs px-2.5 py-1 bg-[#EEF2FF] dark:bg-[#818CF8]/20 text-[#3730A3] dark:text-[#818CF8] rounded-lg font-medium opacity-50 cursor-not-allowed">
+                    Permissions unavailable
                   </button>
-                  <button className="text-xs px-2.5 py-1 bg-[#F1F3FB] dark:bg-white/5 text-[#374151] dark:text-gray-300 rounded-lg font-medium hover:opacity-90">
-                    Assign
+                  <button disabled title="Role assignment is not available in the documented API" className="text-xs px-2.5 py-1 bg-[#F1F3FB] dark:bg-white/5 text-[#374151] dark:text-gray-300 rounded-lg font-medium opacity-50 cursor-not-allowed">
+                    Assign unavailable
                   </button>
                 </div>
               </div>
@@ -3284,7 +2569,7 @@ export function AdminApp({
 }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout } = useAuth();
+  const { logout, admin } = useAuth();
 
   // Dark mode state
   const [internalIsDark, setInternalIsDark] = useState(() => {
@@ -3341,39 +2626,22 @@ export function AdminApp({
   const pendingKycQuery = usePendingAdminKyc(
     section === "kyc" || section === "kyc-detail",
   );
+  const userRolesQuery = useAdminUserRoles();
+  const members = (userRolesQuery.data ?? []).map(mapAdminRoleToMember);
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window !== "undefined") {
       return window.innerWidth >= 768;
     }
     return true;
   });
-  const [members, setMembers] = useState<Member[]>(INITIAL_MEMBERS);
-  const [selectedMember, setSelectedMember] = useState<Member>(
-    INITIAL_MEMBERS[0],
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const kycQueue = (pendingKycQuery.data ?? []).map(mapPendingKycUser);
+  const savingsGroupsQuery = useAdminSavingsGroups(
+    section === "savings-programs" || section === "program-detail",
   );
-  const [kycQueue, setKycQueue] = useState<KYCItem[]>([]);
-  const [savingsPrograms, setSavingsPrograms] = useState<SavingsProgram[]>(
-    INITIAL_SAVINGS_PROGRAMS,
-  );
-  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(
-    INITIAL_NOTIFICATIONS,
-  );
-
-  useEffect(() => {
-    if (pendingKycQuery.data) {
-      setKycQueue(pendingKycQuery.data.map(mapPendingKycUser));
-    }
-  }, [pendingKycQuery.data]);
+  const savingsPrograms = (savingsGroupsQuery.data ?? []).map(mapSavingsGroup);
 
   // Modals & Interactive View States
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [editProductForm, setEditProductForm] = useState<Product | null>(null);
-  const [isEditProductSaved, setIsEditProductSaved] = useState(false);
-  const [productModalTab, setProductModalTab] = useState<"edit" | "preview">(
-    "edit",
-  );
-  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [selectedWalletMember, setSelectedWalletMember] =
     useState<Member | null>(null);
   const approveKycMutation = useApproveAdminKyc();
@@ -3387,17 +2655,13 @@ export function AdminApp({
   );
   const blockUserMutation = useBlockAdminUser();
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [showNotificationDropdown, setShowNotificationDropdown] =
-    useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteName, setInviteName] = useState("");
-  const [inviteSent, setInviteSent] = useState(false);
 
   // Global Search
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const q = searchQuery.trim().toLowerCase();
+  const searchGroupsQuery = useAdminSavingsGroups(!!q);
   const searchContainerRef = useRef<HTMLDivElement>(null);
-  const notifContainerRef = useRef<HTMLDivElement>(null);
 
   // Close search and notification dropdown on outside click
   useEffect(() => {
@@ -3407,12 +2671,6 @@ export function AdminApp({
         !searchContainerRef.current.contains(e.target as Node)
       ) {
         setIsSearchFocused(false);
-      }
-      if (
-        notifContainerRef.current &&
-        !notifContainerRef.current.contains(e.target as Node)
-      ) {
-        setShowNotificationDropdown(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -3431,7 +2689,11 @@ export function AdminApp({
     if (navItem) {
       navigate(navItem.path);
     } else if (s === "member-detail") {
-      navigate(`/dashboard/members/${selectedMember?.id || 1}`);
+      navigate(
+        selectedMember
+          ? `/dashboard/members/${selectedMember.id}`
+          : "/dashboard/members",
+      );
     } else if (s === "notifications") {
       navigate("/dashboard/notifications");
     } else {
@@ -3440,7 +2702,6 @@ export function AdminApp({
   };
 
   // Search Results Computation
-  const q = searchQuery.trim().toLowerCase();
   const searchResults = {
     members: q
       ? members.filter(
@@ -3450,15 +2711,8 @@ export function AdminApp({
             m.group.toLowerCase().includes(q),
         )
       : [],
-    products: q
-      ? products.filter(
-          (p) =>
-            p.name.toLowerCase().includes(q) ||
-            p.category.toLowerCase().includes(q),
-        )
-      : [],
     programs: q
-      ? savingsPrograms.filter(
+      ? (searchGroupsQuery.data ?? []).map(mapSavingsGroup).filter(
           (p) =>
             p.name.toLowerCase().includes(q) ||
             p.type.toLowerCase().includes(q),
@@ -3467,7 +2721,6 @@ export function AdminApp({
   };
   const hasSearchResults =
     searchResults.members.length > 0 ||
-    searchResults.products.length > 0 ||
     searchResults.programs.length > 0;
 
   // Action handlers
@@ -3477,14 +2730,6 @@ export function AdminApp({
 
     try {
       await approveKycMutation.mutateAsync(pendingUser.id);
-      setKycQueue((prev) => prev.filter((kyc) => kyc.id !== id));
-      setMembers((prev) =>
-        prev.map((member) =>
-          member.email === pendingUser.email
-            ? { ...member, kyc: "approved" as const, status: "active" as const }
-            : member,
-        ),
-      );
       toast.success("KYC approved successfully");
     } catch (error) {
       toast.error(
@@ -3500,21 +2745,6 @@ export function AdminApp({
       const result = await blockUserMutation.mutateAsync(
         selectedWalletMember.email,
       );
-      setMembers((prev) =>
-        prev.map((member) =>
-          member.email === result.email
-            ? {
-                ...member,
-                status: result.isBlocked ? "suspended" : "active",
-              }
-            : member,
-        ),
-      );
-      setSelectedWalletMember((current) =>
-        current?.email === result.email
-          ? { ...current, status: result.isBlocked ? "suspended" : "active" }
-          : current,
-      );
       toast.success(result.statusMessage || "User status updated");
     } catch (error) {
       toast.error(
@@ -3523,109 +2753,8 @@ export function AdminApp({
     }
   };
 
-  const handleRejectKYC = (id: string, _reason: string) => {
-    setKycQueue((prev) => prev.filter((k) => k.id !== id));
-    setMembers((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, kyc: "rejected" as const } : m)),
-    );
-  };
-
-  const handleAddProgram = (newP: SavingsProgram) => {
-    setSavingsPrograms((prev) => [newP, ...prev]);
-  };
-
-  const handleAddProduct = (newPr: Product) => {
-    setProducts((prev) => [newPr, ...prev]);
-  };
-
-  const handleOpenEditProduct = (p: Product) => {
-    setSelectedProduct(p);
-    setEditProductForm({
-      ...p,
-      specs:
-        p.specs && p.specs.length > 0
-          ? [...p.specs]
-          : [
-              "Official 1-Year Warranty",
-              "Express Hub Pickup in Lagos/Abuja",
-              "Eligible for 50% down installment plan",
-            ],
-    });
-    setProductModalTab("edit");
-    setIsEditProductSaved(false);
-  };
-
-  const handleSaveProductEdit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editProductForm) return;
-    setProducts((prev) =>
-      prev.map((p) => (p.id === editProductForm.id ? editProductForm : p)),
-    );
-    setSelectedProduct(editProductForm);
-    setIsEditProductSaved(true);
-    setTimeout(() => setIsEditProductSaved(false), 2500);
-  };
-
-  const confirmDeleteProduct = () => {
-    if (!productToDelete) return;
-    setProducts((prev) => prev.filter((p) => p.id !== productToDelete.id));
-    if (selectedProduct?.id === productToDelete.id) {
-      setSelectedProduct(null);
-      setEditProductForm(null);
-    }
-    setProductToDelete(null);
-  };
-
-  const handleDeleteProduct = (id: string) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-    if (selectedProduct?.id === id) {
-      setSelectedProduct(null);
-      setEditProductForm(null);
-    }
-  };
-
-  const handleMarkAllNotificationsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  };
-
-  const handleNotificationClick = (notif: NotificationItem) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n)),
-    );
-    setShowNotificationDropdown(false);
-    nav(notif.actionSection);
-  };
-
-  const unreadNotifCount = notifications.filter((n) => !n.read).length;
-
-  const handleInviteSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inviteEmail || !inviteName) return;
-    setMembers((prev) => [
-      {
-        id: String(Date.now()),
-        name: inviteName,
-        email: inviteEmail,
-        phone: "+234 800 000 0000",
-        kyc: "pending" as const,
-        joined: "Just now",
-        wallet: 0,
-        savings: 0,
-        status: "pending" as const,
-        group: "Community Thrift",
-        accountNumber: `99283746${Math.floor(10 + Math.random() * 90)}`,
-        bankName: "PAVE Virtual Bank / Providus",
-        tier: "Tier 1 - Unverified",
-      },
-      ...prev,
-    ]);
-    setInviteSent(true);
-    setTimeout(() => {
-      setInviteSent(false);
-      setShowInviteModal(false);
-      setInviteName("");
-      setInviteEmail("");
-    }, 1500);
+  const handleRejectKYC = (_id: string, _reason: string) => {
+    toast.error("KYC rejection is not available in the documented API.");
   };
 
   const handleSignOut = async () => {
@@ -3650,6 +2779,15 @@ export function AdminApp({
         return (
           <MembersSection
             members={members}
+            isLoading={userRolesQuery.isLoading}
+            error={
+              userRolesQuery.error instanceof Error
+                ? userRolesQuery.error.message
+                : userRolesQuery.isError
+                  ? "Unable to load users"
+                  : null
+            }
+            onRetry={() => void userRolesQuery.refetch()}
             onNav={nav}
             setSelectedMember={setSelectedMember}
             onInvite={() => setShowInviteModal(true)}
@@ -3660,11 +2798,6 @@ export function AdminApp({
           <MemberDetailSection
             member={selectedMember}
             onBack={() => nav("members")}
-            onUpdateMember={(id, updates) => {
-              setMembers((prev) =>
-                prev.map((m) => (m.id === id ? { ...m, ...updates } : m)),
-              );
-            }}
           />
         );
       case "kyc":
@@ -3691,14 +2824,31 @@ export function AdminApp({
       case "program-detail":
         return (
           <SavingsProgramsSection
-            programs={savingsPrograms}
-            onAddProgram={handleAddProgram}
+            groups={savingsPrograms}
+            isLoading={savingsGroupsQuery.isLoading}
+            error={
+              savingsGroupsQuery.error instanceof Error
+                ? savingsGroupsQuery.error.message
+                : savingsGroupsQuery.isError
+                  ? "Unable to load savings groups"
+                  : null
+            }
+            onRetry={() => void savingsGroupsQuery.refetch()}
           />
         );
       case "wallets":
         return (
           <WalletsSection
             members={members}
+            isLoading={userRolesQuery.isLoading}
+            error={
+              userRolesQuery.error instanceof Error
+                ? userRolesQuery.error.message
+                : userRolesQuery.isError
+                  ? "Unable to load wallet users"
+                  : null
+            }
+            onRetry={() => void userRolesQuery.refetch()}
             onSelectMember={(m) => setSelectedWalletMember(m)}
           />
         );
@@ -3706,14 +2856,7 @@ export function AdminApp({
         return <AdminTransactionsSection />;
       case "marketplace":
       case "product-form":
-        return (
-          <MarketplaceSection
-            products={products}
-            onAddProduct={handleAddProduct}
-            onDeleteProduct={(p) => setProductToDelete(p)}
-            onSelectProduct={handleOpenEditProduct}
-          />
-        );
+        return <MarketplaceSection />;
       case "messaging":
       case "broadcast":
         return <MessagingSection />;
@@ -3726,47 +2869,10 @@ export function AdminApp({
           <div>
             <PageHeader
               title="Notifications"
-              subtitle="All system updates, member alerts and operational notices"
-              action={
-                <button
-                  onClick={handleMarkAllNotificationsRead}
-                  className="px-4 py-2 bg-[#EEF2FF] dark:bg-[#818CF8]/20 text-[#3730A3] dark:text-[#818CF8] rounded-xl text-xs font-semibold flex items-center gap-2 hover:opacity-90"
-                >
-                  <CheckCheck size={14} />
-                  Mark all as read
-                </button>
-              }
+              subtitle="Notification features are not available in the documented API."
             />
-            <div className="bg-white dark:bg-[#111327] rounded-2xl border border-[#F1F3FB] dark:border-white/10 divide-y divide-[#F9FAFB] dark:divide-white/5 overflow-hidden shadow-sm">
-              {notifications.map((n) => (
-                <div
-                  key={n.id}
-                  onClick={() => handleNotificationClick(n)}
-                  className={`p-4 sm:p-5 flex items-start gap-4 hover:bg-[#F9FAFB] dark:hover:bg-white/5 cursor-pointer transition-colors ${
-                    !n.read ? "bg-[#EEF2FF]/40 dark:bg-[#818CF8]/5" : ""
-                  }`}
-                >
-                  <div className="w-10 h-10 rounded-xl bg-[#EEF2FF] dark:bg-[#818CF8]/20 text-[#3730A3] dark:text-[#818CF8] flex items-center justify-center flex-shrink-0">
-                    <Bell size={18} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold text-sm text-[#0D0F1C] dark:text-[#F0F2FF]">
-                        {n.title}
-                      </span>
-                      <span className="text-xs text-[#9CA3AF] flex-shrink-0">
-                        {n.time}
-                      </span>
-                    </div>
-                    <p className="text-xs sm:text-sm text-[#6B7280] dark:text-[#94A3B8] mt-1">
-                      {n.description}
-                    </p>
-                  </div>
-                  {!n.read && (
-                    <div className="w-2 h-2 rounded-full bg-[#3730A3] flex-shrink-0 mt-2" />
-                  )}
-                </div>
-              ))}
+            <div className="rounded-2xl border border-[#F1F3FB] bg-white p-8 text-center text-sm text-[#9CA3AF] shadow-sm dark:border-white/10 dark:bg-[#111327]">
+              The documented API collection has no admin notifications endpoint.
             </div>
           </div>
         );
@@ -3941,7 +3047,7 @@ export function AdminApp({
                     setIsSearchFocused(true);
                   }}
                   onFocus={() => setIsSearchFocused(true)}
-                  placeholder="Search members, transactions, products..."
+                  placeholder="Search members and savings groups..."
                   className="w-full bg-transparent text-sm outline-none text-[#0D0F1C] dark:text-[#F0F2FF] placeholder:text-[#9CA3AF]"
                 />
                 {searchQuery && (
@@ -4005,47 +3111,7 @@ export function AdminApp({
                                   </div>
                                 </div>
                                 <span className="text-xs font-semibold text-[#059669]">
-                                  {fmt(m.wallet)}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-
-                        {searchResults.products.length > 0 && (
-                          <div className="p-2">
-                            <div className="text-[11px] font-bold uppercase tracking-wider text-[#9CA3AF] px-3 py-1">
-                              Marketplace Products (
-                              {searchResults.products.length})
-                            </div>
-                            {searchResults.products.map((p) => (
-                              <button
-                                key={p.id}
-                                onClick={() => {
-                                  handleOpenEditProduct(p);
-                                  setIsSearchFocused(false);
-                                  setSearchQuery("");
-                                  nav("marketplace");
-                                }}
-                                className="w-full px-3 py-2 rounded-xl flex items-center justify-between hover:bg-[#F9FAFB] dark:hover:bg-white/5 text-left transition-colors"
-                              >
-                                <div className="flex items-center gap-2.5">
-                                  <ImageWithFallback
-                                    src={p.image}
-                                    alt={p.name}
-                                    className="w-7 h-7 rounded-lg object-cover"
-                                  />
-                                  <div>
-                                    <div className="text-sm font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
-                                      {p.name}
-                                    </div>
-                                    <div className="text-xs text-[#9CA3AF]">
-                                      {p.category} · Stock: {p.stock}
-                                    </div>
-                                  </div>
-                                </div>
-                                <span className="text-xs font-semibold text-[#3730A3] dark:text-[#818CF8]">
-                                  {fmt(p.price)}
+                                  {m.wallet === undefined ? "—" : fmt(m.wallet)}
                                 </span>
                               </button>
                             ))}
@@ -4111,115 +3177,21 @@ export function AdminApp({
               )}
             </button>
 
-            {/* Notification Bell with Dropdown UI */}
-            <div ref={notifContainerRef} className="relative">
-              <button
-                onClick={() =>
-                  setShowNotificationDropdown(!showNotificationDropdown)
-                }
-                className="relative w-9 h-9 rounded-xl bg-[#F1F3FB] dark:bg-white/5 flex items-center justify-center hover:bg-[#EEF2FF] dark:hover:bg-white/10 transition-colors"
-                title="Notifications"
-              >
-                <Bell
-                  size={17}
-                  className="text-[#374151] dark:text-[#F0F2FF]"
-                />
-                {unreadNotifCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-[#DC2626] rounded-full border-2 border-white dark:border-[#0D0F20]" />
-                )}
-              </button>
-
-              <AnimatePresence>
-                {showNotificationDropdown && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                    className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-[#111327] rounded-2xl shadow-2xl border border-[#F1F3FB] dark:border-white/10 overflow-hidden z-50"
-                  >
-                    <div className="p-4 border-b border-[#F1F3FB] dark:border-white/10 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-[#0D0F1C] dark:text-[#F0F2FF]">
-                          Notifications
-                        </span>
-                        {unreadNotifCount > 0 && (
-                          <span className="px-2 py-0.5 rounded-full bg-[#3730A3] text-white text-[11px] font-bold">
-                            {unreadNotifCount} new
-                          </span>
-                        )}
-                      </div>
-                      {unreadNotifCount > 0 && (
-                        <button
-                          onClick={handleMarkAllNotificationsRead}
-                          className="text-xs text-[#3730A3] dark:text-[#818CF8] font-semibold hover:underline"
-                        >
-                          Mark all as read
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="max-h-[360px] overflow-y-auto divide-y divide-[#F9FAFB] dark:divide-white/5">
-                      {notifications.map((n) => (
-                        <div
-                          key={n.id}
-                          onClick={() => handleNotificationClick(n)}
-                          className={`p-3.5 flex items-start gap-3 hover:bg-[#F9FAFB] dark:hover:bg-white/5 cursor-pointer transition-colors ${
-                            !n.read ? "bg-[#EEF2FF]/30 dark:bg-[#818CF8]/5" : ""
-                          }`}
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-[#EEF2FF] dark:bg-[#818CF8]/20 text-[#3730A3] dark:text-[#818CF8] flex items-center justify-center flex-shrink-0 mt-0.5">
-                            {n.category === "kyc" && <Shield size={15} />}
-                            {n.category === "savings" && (
-                              <PiggyBank size={15} />
-                            )}
-                            {n.category === "marketplace" && (
-                              <ShoppingBag size={15} />
-                            )}
-                            {n.category === "wallet" && <Wallet size={15} />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-1">
-                              <span className="text-xs font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
-                                {n.title}
-                              </span>
-                              <span className="text-[10px] text-[#9CA3AF] flex-shrink-0">
-                                {n.time}
-                              </span>
-                            </div>
-                            <p className="text-xs text-[#6B7280] dark:text-[#94A3B8] mt-0.5 leading-snug">
-                              {n.description}
-                            </p>
-                          </div>
-                          {!n.read && (
-                            <div className="w-2 h-2 rounded-full bg-[#3730A3] flex-shrink-0 mt-1.5" />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="p-2.5 border-t border-[#F1F3FB] dark:border-white/10 text-center bg-[#F9FAFB] dark:bg-white/5">
-                      <button
-                        onClick={() => {
-                          setShowNotificationDropdown(false);
-                          nav("notifications");
-                        }}
-                        className="text-xs font-semibold text-[#3730A3] dark:text-[#818CF8] hover:underline"
-                      >
-                        View all notifications
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            <button
+              disabled
+              title="Notifications are unavailable in the documented API"
+              className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-xl bg-[#F1F3FB] opacity-50 dark:bg-white/5"
+            >
+              <Bell size={17} className="text-[#374151] dark:text-[#F0F2FF]" />
+            </button>
 
             {/* Profile Avatar Initials */}
             <div
               className="w-9 h-9 rounded-full bg-[#3730A3] flex items-center justify-center text-white text-xs font-bold shadow-sm cursor-pointer hover:opacity-90 transition-opacity flex-shrink-0"
-              title="Admin Benjamin Okonkwo"
+              title={admin?.name || "Admin account"}
               onClick={() => nav("settings")}
             >
-              BO
+              {admin?.name?.slice(0, 2).toUpperCase() || "AD"}
             </div>
           </div>
         </header>
@@ -4242,845 +3214,6 @@ export function AdminApp({
       </div>
 
       {/* Product Edit & Detail Modal */}
-      <AnimatePresence>
-        {selectedProduct && editProductForm && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-            onClick={() => setSelectedProduct(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-[#111327] rounded-3xl p-6 sm:p-7 w-full max-w-2xl shadow-2xl border border-white/10 max-h-[90vh] overflow-y-auto"
-            >
-              {/* Modal Top Header */}
-              <div className="flex items-center justify-between pb-4 border-b border-[#F1F3FB] dark:border-white/10 mb-5">
-                <div className="flex items-center gap-2.5">
-                  <span
-                    className="text-lg font-bold text-[#0D0F1C] dark:text-[#F0F2FF]"
-                    style={{
-                      fontFamily:
-                        "var(--font-family-display, 'Bricolage Grotesque')",
-                    }}
-                  >
-                    Edit Product
-                  </span>
-                  <Badge color="gray">{editProductForm.category}</Badge>
-                  <Badge
-                    color={
-                      editProductForm.status === "active" ? "green" : "red"
-                    }
-                  >
-                    {editProductForm.status === "active"
-                      ? "In Stock"
-                      : "Out of Stock"}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-2">
-                  {/* Mode Switcher */}
-                  <div className="bg-[#F1F3FB] dark:bg-white/5 p-1 rounded-xl flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setProductModalTab("edit")}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-                        productModalTab === "edit"
-                          ? "bg-white dark:bg-[#3730A3] text-[#3730A3] dark:text-white shadow-sm"
-                          : "text-[#6B7280] dark:text-[#94A3B8] hover:text-[#0D0F1C]"
-                      }`}
-                    >
-                      <Edit2 size={13} />
-                      Edit Details
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setProductModalTab("preview")}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-                        productModalTab === "preview"
-                          ? "bg-white dark:bg-[#3730A3] text-[#3730A3] dark:text-white shadow-sm"
-                          : "text-[#6B7280] dark:text-[#94A3B8] hover:text-[#0D0F1C]"
-                      }`}
-                    >
-                      <Eye size={13} />
-                      Preview
-                    </button>
-                  </div>
-                  <button
-                    onClick={() => setSelectedProduct(null)}
-                    className="w-8 h-8 rounded-full bg-[#F1F3FB] dark:bg-white/5 flex items-center justify-center text-[#9CA3AF] hover:text-foreground transition-colors ml-1"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Edit Mode View */}
-              {productModalTab === "edit" ? (
-                <form onSubmit={handleSaveProductEdit} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Product Name */}
-                    <div className="sm:col-span-2">
-                      <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
-                        Product Name *
-                      </label>
-                      <input
-                        value={editProductForm.name}
-                        onChange={(e) =>
-                          setEditProductForm({
-                            ...editProductForm,
-                            name: e.target.value,
-                          })
-                        }
-                        placeholder="e.g. Samsung Galaxy S25 Ultra"
-                        required
-                        className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]"
-                      />
-                    </div>
-
-                    {/* Category */}
-                    <div>
-                      <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
-                        Category
-                      </label>
-                      <select
-                        value={editProductForm.category}
-                        onChange={(e) =>
-                          setEditProductForm({
-                            ...editProductForm,
-                            category: e.target.value,
-                          })
-                        }
-                        className="w-full bg-[#F1F3FB] dark:bg-[#1E2140] rounded-xl px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]"
-                      >
-                        {[
-                          "Electronics",
-                          "Fashion",
-                          "Home",
-                          "Kitchen",
-                          "Appliances",
-                          "Gadgets",
-                        ].map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Price */}
-                    <div>
-                      <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
-                        Retail Price (₦) *
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={editProductForm.price}
-                        onChange={(e) =>
-                          setEditProductForm({
-                            ...editProductForm,
-                            price: Number(e.target.value) || 0,
-                          })
-                        }
-                        required
-                        className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]"
-                      />
-                    </div>
-
-                    {/* Stock */}
-                    <div>
-                      <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
-                        Stock Quantity *
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={editProductForm.stock}
-                        onChange={(e) => {
-                          const val = Number(e.target.value) || 0;
-                          setEditProductForm({
-                            ...editProductForm,
-                            stock: val,
-                            status: val > 0 ? "active" : "out_of_stock",
-                          });
-                        }}
-                        required
-                        className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]"
-                      />
-                    </div>
-
-                    {/* Status */}
-                    <div>
-                      <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
-                        Availability Status
-                      </label>
-                      <select
-                        value={editProductForm.status}
-                        onChange={(e) =>
-                          setEditProductForm({
-                            ...editProductForm,
-                            status: e.target.value as "active" | "out_of_stock",
-                          })
-                        }
-                        className="w-full bg-[#F1F3FB] dark:bg-[#1E2140] rounded-xl px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]"
-                      >
-                        <option value="active">Active (In Stock)</option>
-                        <option value="out_of_stock">Out of Stock</option>
-                      </select>
-                    </div>
-
-                    {/* Image URL */}
-                    <div className="sm:col-span-2">
-                      <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
-                        Product Image URL
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          value={editProductForm.image}
-                          onChange={(e) =>
-                            setEditProductForm({
-                              ...editProductForm,
-                              image: e.target.value,
-                            })
-                          }
-                          placeholder="https://..."
-                          className="flex-1 bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]"
-                        />
-                        <ImageWithFallback
-                          src={editProductForm.image}
-                          alt="preview"
-                          className="w-10 h-10 rounded-xl object-cover border border-[#E5E7EB] dark:border-white/10 flex-shrink-0"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Description */}
-                    <div className="sm:col-span-2">
-                      <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
-                        Product Description
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={editProductForm.description || ""}
-                        onChange={(e) =>
-                          setEditProductForm({
-                            ...editProductForm,
-                            description: e.target.value,
-                          })
-                        }
-                        placeholder="Detailed description of features, warranty, and specifications..."
-                        className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#3730A3] resize-none text-[#0D0F1C] dark:text-[#F0F2FF]"
-                      />
-                    </div>
-
-                    {/* Specifications (One per line) */}
-                    <div className="sm:col-span-2">
-                      <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
-                        Key Specifications (Enter each spec on a new line)
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={(editProductForm.specs || []).join("\n")}
-                        onChange={(e) =>
-                          setEditProductForm({
-                            ...editProductForm,
-                            specs: e.target.value
-                              .split("\n")
-                              .filter((s) => s.trim().length > 0),
-                          })
-                        }
-                        placeholder="1 Year Warranty&#10;5000mAh Battery&#10;Express Delivery"
-                        className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-2.5 text-sm outline-none border border-transparent focus:border-[#3730A3] resize-none text-[#0D0F1C] dark:text-[#F0F2FF]"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Dynamic Pricing Calculation Preview */}
-                  <div className="bg-[#EEF2FF] dark:bg-[#818CF8]/10 rounded-2xl p-4 mt-2">
-                    <div className="text-xs text-[#3730A3] dark:text-[#818CF8] font-semibold uppercase tracking-wider">
-                      Auto-Calculated Installment Breakdown
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2 pt-2 border-t border-[#3730A3]/10 text-xs">
-                      <div>
-                        <span className="text-[#6B7280] block">
-                          50% Down Payment:
-                        </span>
-                        <span className="font-bold text-[#7C3AED] text-sm">
-                          {fmt(editProductForm.price * 0.5)}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[#6B7280] block">
-                          3-Month Plan:
-                        </span>
-                        <span className="font-bold text-[#0D0F1C] dark:text-white text-sm">
-                          {fmt(Math.round((editProductForm.price * 0.5) / 3))}
-                          /mo
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[#6B7280] block">
-                          6-Month Plan:
-                        </span>
-                        <span className="font-bold text-[#0D0F1C] dark:text-white text-sm">
-                          {fmt(Math.round((editProductForm.price * 0.5) / 6))}
-                          /mo
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Form Footer Action Buttons */}
-                  <div className="pt-3 border-t border-[#F1F3FB] dark:border-white/10 flex items-center justify-between gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setProductToDelete(editProductForm)}
-                      className="px-4 py-2.5 bg-[#FEF2F2] dark:bg-[#EF4444]/20 hover:bg-[#FEE2E2] text-[#DC2626] rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5"
-                    >
-                      <Trash2 size={14} />
-                      Delete Product
-                    </button>
-
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedProduct(null)}
-                        className="px-4 py-2.5 border border-[#E5E7EB] dark:border-white/10 rounded-xl text-xs font-semibold text-[#374151] dark:text-gray-300 hover:bg-[#F9FAFB] transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-5 py-2.5 bg-[#3730A3] hover:bg-[#312E81] text-white rounded-xl text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5"
-                      >
-                        {isEditProductSaved ? (
-                          <>
-                            <Check size={15} />
-                            Saved Successfully!
-                          </>
-                        ) : (
-                          "Save Changes"
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </form>
-              ) : (
-                /* Member Preview Mode */
-                <div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div>
-                      <ImageWithFallback
-                        src={editProductForm.image}
-                        alt={editProductForm.name}
-                        className="w-full aspect-square rounded-2xl object-cover bg-[#F1F3FB] dark:bg-white/5 border border-[#F1F3FB] dark:border-white/10"
-                      />
-                      <div className="grid grid-cols-2 gap-3 mt-4">
-                        <div className="bg-[#F9FAFB] dark:bg-white/5 p-3 rounded-xl text-center">
-                          <div className="text-xs text-[#9CA3AF]">
-                            Stock Level
-                          </div>
-                          <div className="text-lg font-bold text-[#0D0F1C] dark:text-[#F0F2FF] mt-0.5">
-                            {editProductForm.stock} units
-                          </div>
-                        </div>
-                        <div className="bg-[#F9FAFB] dark:bg-white/5 p-3 rounded-xl text-center">
-                          <div className="text-xs text-[#9CA3AF]">
-                            Total Sales
-                          </div>
-                          <div className="text-lg font-bold text-[#059669] mt-0.5">
-                            {editProductForm.sales} sold
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col">
-                      <h2
-                        className="text-xl sm:text-2xl font-bold text-[#0D0F1C] dark:text-[#F0F2FF] mb-2"
-                        style={{
-                          fontFamily:
-                            "var(--font-family-display, 'Bricolage Grotesque')",
-                        }}
-                      >
-                        {editProductForm.name}
-                      </h2>
-
-                      <div className="bg-[#EEF2FF] dark:bg-[#818CF8]/10 rounded-2xl p-4 my-3">
-                        <div className="text-xs text-[#3730A3] dark:text-[#818CF8] font-semibold uppercase tracking-wider">
-                          Pricing & Installments
-                        </div>
-                        <div className="flex items-baseline gap-2 mt-1">
-                          <span
-                            className="text-2xl font-black text-[#3730A3] dark:text-[#818CF8]"
-                            style={{ fontFamily: "var(--font-family-display)" }}
-                          >
-                            {fmt(editProductForm.price)}
-                          </span>
-                          <span className="text-xs text-[#6B7280]">
-                            retail price
-                          </span>
-                        </div>
-                        <div className="mt-3 pt-3 border-t border-[#3730A3]/10 text-xs flex justify-between">
-                          <span className="text-[#374151] dark:text-gray-300 font-medium">
-                            50% Down Payment:
-                          </span>
-                          <span className="font-bold text-[#7C3AED]">
-                            {fmt(editProductForm.price * 0.5)}
-                          </span>
-                        </div>
-                        <div className="mt-1 text-xs flex justify-between">
-                          <span className="text-[#374151] dark:text-gray-300 font-medium">
-                            3-Month Monthly:
-                          </span>
-                          <span className="font-semibold text-[#0D0F1C] dark:text-white">
-                            {fmt(Math.round((editProductForm.price * 0.5) / 3))}
-                            /mo
-                          </span>
-                        </div>
-                        <div className="mt-1 text-xs flex justify-between">
-                          <span className="text-[#374151] dark:text-gray-300 font-medium">
-                            6-Month Monthly:
-                          </span>
-                          <span className="font-semibold text-[#0D0F1C] dark:text-white">
-                            {fmt(Math.round((editProductForm.price * 0.5) / 6))}
-                            /mo
-                          </span>
-                        </div>
-                      </div>
-
-                      <p className="text-xs sm:text-sm text-[#6B7280] dark:text-[#94A3B8] leading-relaxed mb-4">
-                        {editProductForm.description ||
-                          "Top rated electronic and consumer device eligible for automated PAVE thrift installment plans."}
-                      </p>
-
-                      <div className="space-y-2 mb-6">
-                        <div className="text-xs font-bold uppercase text-[#9CA3AF] tracking-wider">
-                          Specifications
-                        </div>
-                        {(
-                          editProductForm.specs || [
-                            "Official 1-Year Warranty",
-                            "Free hub delivery in Lagos/Abuja",
-                          ]
-                        ).map((sp, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center gap-2 text-xs text-[#374151] dark:text-gray-300"
-                          >
-                            <Check size={14} className="text-[#059669]" />
-                            <span>{sp}</span>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="mt-auto flex gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setProductModalTab("edit")}
-                          className="flex-1 py-2.5 bg-[#3730A3] hover:bg-[#312E81] text-white rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm"
-                        >
-                          <Edit2 size={13} />
-                          Edit These Details
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setProductToDelete(editProductForm)}
-                          className="px-4 py-2.5 bg-[#FEF2F2] dark:bg-[#EF4444]/20 text-[#DC2626] rounded-xl text-xs font-semibold hover:bg-[#FEE2E2] transition-colors flex items-center gap-1.5"
-                        >
-                          <Trash2 size={14} />
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Delete Product Warning Confirmation Modal */}
-      <AnimatePresence>
-        {productToDelete && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-            onClick={() => setProductToDelete(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-[#111327] rounded-3xl p-6 sm:p-7 w-full max-w-md shadow-2xl border border-white/10"
-            >
-              <div className="w-14 h-14 rounded-2xl bg-[#FEF2F2] dark:bg-[#EF4444]/20 flex items-center justify-center mx-auto mb-4 text-[#DC2626]">
-                <AlertTriangle size={30} />
-              </div>
-
-              <h3
-                style={{
-                  fontFamily:
-                    "var(--font-family-display, 'Bricolage Grotesque')",
-                  fontWeight: 700,
-                  fontSize: 20,
-                }}
-                className="text-center text-[#0D0F1C] dark:text-[#F0F2FF]"
-              >
-                Delete Product?
-              </h3>
-
-              <p className="text-[#6B7280] dark:text-[#94A3B8] text-sm text-center mt-2 leading-relaxed">
-                Are you sure you want to delete{" "}
-                <span className="font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
-                  "{productToDelete.name}"
-                </span>
-                ? This will permanently remove the item from the marketplace
-                catalog and cannot be undone.
-              </p>
-
-              {/* Product Mini Preview Card */}
-              <div className="flex items-center gap-3 bg-[#F9FAFB] dark:bg-white/5 rounded-2xl p-3.5 mt-5 border border-[#F1F3FB] dark:border-white/10">
-                <ImageWithFallback
-                  src={productToDelete.image}
-                  alt={productToDelete.name}
-                  className="w-12 h-12 rounded-xl object-cover bg-white dark:bg-white/10 flex-shrink-0"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-bold text-[#0D0F1C] dark:text-[#F0F2FF] truncate">
-                    {productToDelete.name}
-                  </div>
-                  <div className="text-xs text-[#9CA3AF] mt-0.5">
-                    {productToDelete.category} · Stock: {productToDelete.stock}
-                  </div>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <div className="text-sm font-bold text-[#3730A3] dark:text-[#818CF8]">
-                    {fmt(productToDelete.price)}
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setProductToDelete(null)}
-                  className="flex-1 py-2.5 border-2 border-[#E5E7EB] dark:border-white/10 rounded-xl text-sm font-semibold hover:bg-[#F9FAFB] dark:hover:bg-white/5 text-[#374151] dark:text-gray-300 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={confirmDeleteProduct}
-                  className="flex-1 py-2.5 bg-[#DC2626] hover:bg-[#B91C1C] text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm"
-                >
-                  <Trash2 size={16} />
-                  Yes, Delete
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Member Wallet Ledger & Account Detail Modal */}
-      <AnimatePresence>
-        {selectedWalletMember && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-            onClick={() => setSelectedWalletMember(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-[#111327] rounded-3xl p-6 sm:p-7 w-full max-w-2xl shadow-2xl border border-white/10 max-h-[90vh] overflow-y-auto"
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between pb-4 border-b border-[#F1F3FB] dark:border-white/10 mb-5">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-[#EEF2FF] dark:bg-[#818CF8]/20 flex items-center justify-center text-[#3730A3] dark:text-[#818CF8] text-lg font-bold">
-                    {selectedWalletMember.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")}
-                  </div>
-                  <div>
-                    <h2
-                      className="text-lg font-bold text-[#0D0F1C] dark:text-[#F0F2FF]"
-                      style={{
-                        fontFamily:
-                          "var(--font-family-display, 'Bricolage Grotesque')",
-                      }}
-                    >
-                      {userDetailsQuery.data?.fullName || selectedWalletMember.name}
-                    </h2>
-                    <p className="text-xs text-[#9CA3AF]">
-                      {userDetailsQuery.data?.email || selectedWalletMember.email} ·{" "}
-                      {userDetailsQuery.data?.phone || selectedWalletMember.phone}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setSelectedWalletMember(null)}
-                  className="w-8 h-8 rounded-full bg-[#F1F3FB] dark:bg-white/5 flex items-center justify-center text-[#9CA3AF] hover:text-foreground"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              {/* Account Card */}
-              <div className="bg-gradient-to-r from-[#1E1B4B] to-[#3730A3] text-white rounded-2xl p-5 shadow-lg mb-6 relative overflow-hidden">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <span className="text-[11px] text-white/70 uppercase tracking-wider font-semibold">
-                      Virtual NGN Account
-                    </span>
-                    <div className="text-2xl font-bold tracking-tight font-display mt-0.5">
-                      {fmt(userDetailsQuery.data?.balance ?? selectedWalletMember.wallet)}
-                    </div>
-                  </div>
-                  <Badge
-                    color={
-                      userDetailsQuery.data?.isBlocked ||
-                      userDetailsQuery.data?.status.toLowerCase() === "blocked"
-                        ? "red"
-                        : "green"
-                    }
-                  >
-                    {userDetailsQuery.data?.status || "Loading status..."}
-                  </Badge>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-3 border-t border-white/15 text-xs">
-                  <div>
-                    <div className="text-white/60 text-[11px]">
-                      Account Number
-                    </div>
-                    <div className="font-semibold tracking-wider">
-                      {userDetailsQuery.data?.accountNumber ||
-                        selectedWalletMember.accountNumber ||
-                        "Not provided"}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-white/60 text-[11px]">
-                      Account Name
-                    </div>
-                    <div className="font-semibold truncate">
-                      {userDetailsQuery.data?.accountName || "Not provided"}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-white/60 text-[11px]">
-                      Account Tier
-                    </div>
-                    <div className="font-semibold">
-                      {selectedWalletMember.tier || "Tier 3 - Verified"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {userDetailsQuery.isLoading && (
-                <p className="mb-4 text-sm text-[#9CA3AF]">
-                  Loading user details...
-                </p>
-              )}
-              {userDetailsQuery.isError && (
-                <div
-                  role="alert"
-                  className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
-                >
-                  {userDetailsQuery.error instanceof Error
-                    ? userDetailsQuery.error.message
-                    : "Unable to load user details"}
-                  <button
-                    onClick={() => void userDetailsQuery.refetch()}
-                    className="ml-3 font-semibold underline"
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
-              {userDetailsQuery.data && (
-                <div className="mb-5 grid grid-cols-1 gap-3 rounded-2xl bg-[#F9FAFB] p-4 text-sm dark:bg-white/5 sm:grid-cols-2">
-                  <div>
-                    <div className="text-xs text-[#9CA3AF]">Address</div>
-                    <div className="mt-1 font-medium text-[#374151] dark:text-gray-200">
-                      {userDetailsQuery.data.address || "Not provided"}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-[#9CA3AF]">Signed up</div>
-                    <div className="mt-1 font-medium text-[#374151] dark:text-gray-200">
-                      {new Date(userDetailsQuery.data.signUpOn).toLocaleDateString()}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-[#9CA3AF]">Last login</div>
-                    <div className="mt-1 font-medium text-[#374151] dark:text-gray-200">
-                      {userDetailsQuery.data.lastLogin
-                        ? new Date(userDetailsQuery.data.lastLogin).toLocaleString()
-                        : "Not available"}
-                    </div>
-                  </div>
-                </div>
-              )}
-              {userDetailsQuery.data && (
-                <div className="mb-5">
-                  {userDetailsQuery.data.isBlocked ||
-                  userDetailsQuery.data.status.toLowerCase() === "blocked" ? (
-                    <div className="rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700 dark:bg-red-950/30 dark:text-red-300">
-                      This user is blocked.
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => void handleBlockUser()}
-                      disabled={blockUserMutation.isPending}
-                      className="rounded-xl bg-[#DC2626] px-4 py-2 text-sm font-semibold text-white hover:bg-[#B91C1C] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {blockUserMutation.isPending
-                        ? "Updating..."
-                        : "Block User"}
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Transaction Ledger */}
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h3
-                    className="text-sm font-bold text-[#0D0F1C] dark:text-[#F0F2FF]"
-                    style={{ fontFamily: "var(--font-family-display)" }}
-                  >
-                    Recent Ledger Activity
-                  </h3>
-                  <span className="text-xs text-[#9CA3AF]">
-                    {userTransactionsQuery.data?.length ?? 0} transactions
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {userTransactionsQuery.isLoading ? (
-                    <p className="py-4 text-center text-sm text-[#9CA3AF]">
-                      Loading user transactions...
-                    </p>
-                  ) : userTransactionsQuery.isError ? (
-                    <div
-                      role="alert"
-                      className="rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300"
-                    >
-                      {userTransactionsQuery.error instanceof Error
-                        ? userTransactionsQuery.error.message
-                        : "Unable to load user transactions"}
-                      <button
-                        onClick={() => void userTransactionsQuery.refetch()}
-                        className="ml-3 font-semibold underline"
-                      >
-                        Retry
-                      </button>
-                    </div>
-                  ) : userTransactionsQuery.data?.length ? (
-                    userTransactionsQuery.data.map((tx) => {
-                      const isCredit =
-                        tx.type?.toLowerCase().includes("credit") ?? false;
-
-                      return (
-                        <div
-                          key={tx._id}
-                          className="flex items-center justify-between rounded-xl bg-[#F9FAFB] p-3 text-xs dark:bg-white/5"
-                        >
-                          <div className="flex min-w-0 items-center gap-3">
-                            <div
-                              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${isCredit ? "bg-[#ECFDF5] text-[#059669]" : "bg-[#FEF2F2] text-[#DC2626]"}`}
-                            >
-                              {isCredit ? (
-                                <ArrowDownLeft size={16} />
-                              ) : (
-                                <ArrowUpRight size={16} />
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="truncate font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
-                                {tx.description || tx.type || "Transaction"}
-                              </div>
-                              <div className="truncate text-[10px] text-[#9CA3AF]">
-                                {new Date(tx.createdAt).toLocaleString()} ·{" "}
-                                {tx.reference}
-                              </div>
-                              <div className="text-[10px] text-[#9CA3AF]">
-                                Status: {tx.status}
-                              </div>
-                            </div>
-                          </div>
-                          <div
-                            className={`ml-3 flex-shrink-0 font-bold ${isCredit ? "text-[#059669]" : "text-[#DC2626]"}`}
-                          >
-                            {fmt(tx.amount)}
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <p className="py-4 text-center text-sm text-[#9CA3AF]">
-                      No transactions found for this user.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 pt-3 border-t border-[#F1F3FB] dark:border-white/10">
-                <button
-                  onClick={() => {
-                    const addAmount = 50000;
-                    setMembers((prev) =>
-                      prev.map((m) =>
-                        m.id === selectedWalletMember.id
-                          ? { ...m, wallet: m.wallet + addAmount }
-                          : m,
-                      ),
-                    );
-                    setSelectedWalletMember((prev) =>
-                      prev
-                        ? { ...prev, wallet: prev.wallet + addAmount }
-                        : null,
-                    );
-                  }}
-                  className="flex-1 py-2.5 bg-[#3730A3] hover:bg-[#312E81] text-white rounded-xl text-xs font-semibold transition-colors shadow-sm"
-                >
-                  Manual Credit (+₦50,000)
-                </button>
-                <button
-                  onClick={() => {
-                    alert(
-                      `Statement exported for ${selectedWalletMember.name}`,
-                    );
-                  }}
-                  className="flex-1 py-2.5 bg-[#F1F3FB] dark:bg-white/5 hover:bg-[#EEF2FF] text-[#374151] dark:text-gray-300 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5"
-                >
-                  <Download size={14} />
-                  Download PDF Statement
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Global Invite Member Modal */}
       <AnimatePresence>
         {showInviteModal && (
@@ -5090,8 +3223,7 @@ export function AdminApp({
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
           >
-            <motion.form
-              onSubmit={handleInviteSubmit}
+            <motion.div
               initial={{ scale: 0.95 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.95 }}
@@ -5114,74 +3246,19 @@ export function AdminApp({
                 </button>
               </div>
 
-              {!inviteSent ? (
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
-                      Full Name
-                    </label>
-                    <input
-                      value={inviteName}
-                      onChange={(e) => setInviteName(e.target.value)}
-                      placeholder="e.g. Kenneth Igwe"
-                      required
-                      className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-3 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
-                      Email Address
-                    </label>
-                    <input
-                      type="email"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      placeholder="e.g. kenneth@example.com"
-                      required
-                      className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-3 text-sm outline-none border border-transparent focus:border-[#3730A3] text-[#0D0F1C] dark:text-[#F0F2FF]"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-[#374151] dark:text-gray-300 block mb-1.5">
-                      Assigned Group
-                    </label>
-                    <select className="w-full bg-[#F1F3FB] dark:bg-[#1E2140] rounded-xl px-4 py-3 text-sm outline-none text-[#0D0F1C] dark:text-[#F0F2FF]">
-                      <option>Community Thrift Group</option>
-                      <option>Staff Cooperative</option>
-                      <option>VIP Investors Club</option>
-                    </select>
-                  </div>
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowInviteModal(false)}
-                      className="flex-1 py-2.5 border-2 border-[#E5E7EB] dark:border-white/10 rounded-xl text-sm font-medium hover:bg-[#F9FAFB] text-[#374151] dark:text-gray-300"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="flex-1 py-2.5 bg-[#3730A3] hover:bg-[#312E81] text-white rounded-xl text-sm font-semibold transition-colors shadow-sm"
-                    >
-                      Send Invitation
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="py-8 flex flex-col items-center gap-3 text-center">
-                  <div className="w-14 h-14 bg-[#ECFDF5] rounded-full flex items-center justify-center">
-                    <CheckCircle size={32} className="text-[#059669]" />
-                  </div>
-                  <div className="font-bold text-lg text-[#0D0F1C] dark:text-[#F0F2FF]">
-                    Invitation Sent!
-                  </div>
-                  <p className="text-xs text-[#9CA3AF]">
-                    The member has been invited to complete registration and
-                    KYC.
-                  </p>
-                </div>
-              )}
-            </motion.form>
+              <div className="space-y-4">
+                <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                  The documented API collection has no member invitation endpoint. No invitation can be sent from this screen.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowInviteModal(false)}
+                  className="w-full rounded-xl border-2 border-[#E5E7EB] py-2.5 text-sm font-medium text-[#374151] dark:border-white/10 dark:text-gray-300"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

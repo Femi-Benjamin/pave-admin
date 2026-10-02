@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminService } from "@/services/api";
-import type { CreateAdminAccountInput } from "@/types";
+import type {
+  CreateAdminAccountInput,
+} from "@/types";
+import type {
+  CreateAdminSavingsGroupInput,
+} from "@/services/api";
 
 const pendingKycQueryKey = ["admin", "pending-kyc"] as const;
 
@@ -104,6 +109,7 @@ export function useBlockAdminUser() {
         queryClient.invalidateQueries({
           queryKey: ["admin", "user-transactions", user.email],
         }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "user-roles"] }),
       ]);
     },
   });
@@ -197,6 +203,176 @@ export function useCreateAdminAccount() {
       }
 
       return response.data;
+    },
+  });
+}
+
+export function useAdminDashboardTotals(enabled = true) {
+  return useQuery({
+    queryKey: ["admin", "dashboard-totals"],
+    enabled,
+    queryFn: async () => {
+      const response = await adminService.getDashboardTotals();
+      if (!response.success || !response.data) {
+        throw new Error(response.error || response.message || "Unable to load dashboard totals");
+      }
+      return response.data;
+    },
+  });
+}
+
+export function useAdminTotalMembers(enabled = true) {
+  return useQuery({
+    queryKey: ["admin", "total-members"],
+    enabled,
+    queryFn: async () => {
+      const response = await adminService.getTotalMembers();
+      if (!response.success || response.data === undefined) {
+        throw new Error(response.error || response.message || "Unable to load total members");
+      }
+      return response.data;
+    },
+  });
+}
+
+export function useAdminUserStatistics(enabled = true) {
+  return useQuery({
+    queryKey: ["admin", "user-statistics"],
+    enabled,
+    queryFn: async () => {
+      const response = await adminService.getUserStatistics();
+      if (!response.success || !response.data) {
+        throw new Error(response.error || response.message || "Unable to load user statistics");
+      }
+      return response.data;
+    },
+  });
+}
+
+export function useAdminDailyRegistrations(enabled = true) {
+  return useQuery({
+    queryKey: ["admin", "daily-registrations"],
+    enabled,
+    queryFn: async () => {
+      const response = await adminService.getDailyRegistrations();
+      if (!response.success || !response.data) {
+        throw new Error(response.error || response.message || "Unable to load daily registrations");
+      }
+      return response.data;
+    },
+  });
+}
+
+export function useAdminRetentionStatistics(enabled = true) {
+  return useQuery({
+    queryKey: ["admin", "retention-statistics"],
+    enabled,
+    queryFn: async () => {
+      const response = await adminService.getRetentionStatistics();
+      if (!response.success || !response.data) {
+        throw new Error(response.error || response.message || "Unable to load retention statistics");
+      }
+      return response.data;
+    },
+  });
+}
+
+export function useAdminCohortAnalysis(enabled = true) {
+  return useQuery({
+    queryKey: ["admin", "cohort-analysis"],
+    enabled,
+    queryFn: async () => {
+      const response = await adminService.getCohortAnalysis();
+      if (!response.success || !response.data) {
+        throw new Error(response.error || response.message || "Unable to load cohort analysis");
+      }
+      return response.data;
+    },
+  });
+}
+
+export function useAdminVendingGraph(enabled = true) {
+  return useQuery({
+    queryKey: ["admin", "vending-graph"],
+    enabled,
+    queryFn: async () => {
+      const response = await adminService.getVendingGraph();
+      if (!response.success || !response.data) {
+        throw new Error(response.error || response.message || "Unable to load vending graph");
+      }
+      return response.data;
+    },
+  });
+}
+
+export function useAdminYearlyVending(enabled = true) {
+  return useQuery({
+    queryKey: ["admin", "vending-yearly"],
+    enabled,
+    queryFn: async () => {
+      const response = await adminService.getYearlyVending();
+      if (!response.success || !response.data) {
+        throw new Error(response.error || response.message || "Unable to load yearly vending data");
+      }
+      return response.data;
+    },
+  });
+}
+
+export function useAdminLeaderboard(enabled = true) {
+  return useQuery({
+    queryKey: ["admin", "leaderboard"],
+    enabled,
+    queryFn: async () => {
+      const response = await adminService.getLeaderboard();
+      if (!response.success || !response.data) {
+        throw new Error(response.error || response.message || "Unable to load user leaderboard");
+      }
+      return response.data;
+    },
+  });
+}
+
+export function useAdminSystemHealth(enabled = true) {
+  return useQuery({
+    queryKey: ["admin", "system-health"],
+    enabled,
+    queryFn: async () => {
+      const response = await adminService.getSystemHealthSummary();
+      if (!response.success || !response.data) {
+        throw new Error(response.error || response.message || "Unable to load system health");
+      }
+      return response.data;
+    },
+  });
+}
+
+export function useAdminSavingsGroups(enabled = true) {
+  return useQuery({
+    queryKey: ["admin", "savings-groups"],
+    enabled,
+    queryFn: async () => {
+      const response = await adminService.getSavingsGroups();
+      if (!response.success || !response.data) {
+        throw new Error(response.error || response.message || "Unable to load savings groups");
+      }
+      return response.data;
+    },
+  });
+}
+
+export function useCreateAdminSavingsGroup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CreateAdminSavingsGroupInput) => {
+      const response = await adminService.createSavingsGroup(input);
+      if (!response.success || !response.data) {
+        throw new Error(response.error || response.message || "Unable to create savings group");
+      }
+      return response.data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin", "savings-groups"] });
     },
   });
 }

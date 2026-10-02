@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { savingsService } from '@/services/api';
 import { SavingsPlan } from '@/types';
-import { formatCurrency, formatDate, getUserById } from '@/data/mockData';
+import { formatCurrency, formatDate } from '@/utils/format';
 import {
   PageHeader,
   StatusBadge,
@@ -108,7 +108,6 @@ export default function SavingsPage() {
           </thead>
           <tbody>
             {savingsPlans.map((plan) => {
-              const user = getUserById(plan.userId);
               const progress = getProgress(plan.currentAmount, plan.targetAmount);
               return (
                 <tr key={plan.id}>
@@ -127,12 +126,7 @@ export default function SavingsPage() {
                   </td>
                   <td>
                     <div className="flex items-center gap-2">
-                      <img
-                        src={user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.fullName}`}
-                        alt={user?.fullName}
-                        className="w-8 h-8 rounded-full"
-                      />
-                      <span className="text-sm">{user?.fullName}</span>
+                      <span className="text-sm">User {plan.userId}</span>
                     </div>
                   </td>
                   <td>{getTypeBadge(plan.type)}</td>
@@ -185,7 +179,6 @@ export default function SavingsPage() {
       <Dialog open={!!selectedPlan} onOpenChange={() => setSelectedPlan(null)}>
         <DialogContent className="max-w-md">
           {selectedPlan && (() => {
-            const user = getUserById(selectedPlan.userId);
             const progress = getProgress(selectedPlan.currentAmount, selectedPlan.targetAmount);
             return (
               <>
@@ -216,7 +209,7 @@ export default function SavingsPage() {
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Owner</span>
-                      <span className="font-medium">{user?.fullName}</span>
+                      <span className="font-medium">User {selectedPlan.userId}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Type</span>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { transactionService } from '@/services/api';
 import { Transaction, TransactionType, TransactionStatus } from '@/types';
-import { formatCurrency, formatDateTime, getUserById } from '@/data/mockData';
+import { formatCurrency, formatDateTime } from '@/utils/format';
 import {
   PageHeader,
   StatusBadge,
@@ -223,7 +223,6 @@ export default function TransactionsPage() {
           </thead>
           <tbody>
             {transactions.map((txn) => {
-              const user = getUserById(txn.userId);
               return (
                 <tr key={txn.id}>
                   <td>
@@ -236,12 +235,7 @@ export default function TransactionsPage() {
                   </td>
                   <td>
                     <div className="flex items-center gap-3">
-                      <img
-                        src={user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.fullName}`}
-                        alt={user?.fullName}
-                        className="w-8 h-8 rounded-full"
-                      />
-                      <span className="text-sm">{user?.fullName}</span>
+                      <span className="text-sm">User {txn.userId}</span>
                     </div>
                   </td>
                   <td>
@@ -286,7 +280,6 @@ export default function TransactionsPage() {
       <Dialog open={!!selectedTransaction} onOpenChange={() => setSelectedTransaction(null)}>
         <DialogContent className="max-w-md">
           {selectedTransaction && (() => {
-            const user = getUserById(selectedTransaction.userId);
             return (
               <>
                 <DialogHeader>
@@ -315,7 +308,7 @@ export default function TransactionsPage() {
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">User</span>
-                      <span className="font-medium">{user?.fullName}</span>
+                      <span className="font-medium">User {selectedTransaction.userId}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Reference</span>

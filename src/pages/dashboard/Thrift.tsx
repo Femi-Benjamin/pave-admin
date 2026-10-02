@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { thriftService } from '@/services/api';
 import { ThriftPlan } from '@/types';
-import { formatCurrency, formatDate, getUserById } from '@/data/mockData';
+import { formatCurrency, formatDate } from '@/utils/format';
 import {
   PageHeader,
   StatusBadge,
@@ -22,54 +22,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { UsersRound, Eye, Users, Calendar, AlertTriangle, Clock, Check, X } from 'lucide-react';
 
-// Simple calendar component for contribution tracking
 function ContributionCalendar({ plan }: { plan: ThriftPlan }) {
-  const startDate = new Date(plan.startDate);
-  const today = new Date();
-  const daysDiff = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-  
-  // Generate contribution days based on frequency
-  const getContributionDays = () => {
-    const days = [];
-    const totalDays = plan.durationMonths * 30;
-    
-    let interval = 1;
-    if (plan.frequency === 'weekly') interval = 7;
-    if (plan.frequency === 'monthly') interval = 30;
-    
-    for (let i = 0; i < Math.min(totalDays, 42); i += interval) {
-      const isPast = i <= daysDiff;
-      const isMissed = isPast && Math.random() > 0.85; // Simulate some missed
-      days.push({ day: i + 1, isPast, isMissed });
-    }
-    return days.slice(0, 12);
-  };
-
-  const days = getContributionDays();
-
   return (
-    <div className="grid grid-cols-6 gap-2">
-      {days.map((day, idx) => (
-        <div
-          key={idx}
-          className={`aspect-square rounded-lg flex items-center justify-center text-xs font-medium ${
-            day.isMissed
-              ? 'bg-destructive/10 text-destructive'
-              : day.isPast
-              ? 'bg-success-light text-success'
-              : 'bg-muted text-muted-foreground'
-          }`}
-        >
-          {day.isMissed ? (
-            <X className="w-4 h-4" />
-          ) : day.isPast ? (
-            <Check className="w-4 h-4" />
-          ) : (
-            <Clock className="w-3 h-3" />
-          )}
-        </div>
-      ))}
-    </div>
+    <p className="text-sm text-muted-foreground">
+      Contribution history is not included in the documented thrift API.
+    </p>
   );
 }
 
@@ -161,7 +118,6 @@ export default function ThriftPage() {
           </thead>
           <tbody>
             {thriftPlans.map((plan) => {
-              const creator = getUserById(plan.creatorUserId);
               return (
                 <tr key={plan.id}>
                   <td>
@@ -172,7 +128,7 @@ export default function ThriftPage() {
                       <div>
                         <p className="font-medium">{plan.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          by {creator?.fullName}
+                          by user {plan.creatorUserId}
                         </p>
                       </div>
                     </div>
@@ -232,13 +188,12 @@ export default function ThriftPage() {
       <Dialog open={!!selectedPlan} onOpenChange={() => setSelectedPlan(null)}>
         <DialogContent className="max-w-lg">
           {selectedPlan && (() => {
-            const creator = getUserById(selectedPlan.creatorUserId);
             return (
               <>
                 <DialogHeader>
                   <DialogTitle>{selectedPlan.name}</DialogTitle>
                   <DialogDescription>
-                    Created by {creator?.fullName}
+                    Created by user {selectedPlan.creatorUserId}
                   </DialogDescription>
                 </DialogHeader>
 

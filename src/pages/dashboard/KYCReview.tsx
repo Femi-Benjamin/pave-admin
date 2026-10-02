@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { kycService } from '@/services/api';
 import { KYCSubmission, KYCStatus } from '@/types';
-import { formatDateTime, getUserById } from '@/data/mockData';
+import { formatDateTime } from '@/utils/format';
 import {
   PageHeader,
   StatusBadge,
@@ -185,19 +185,12 @@ export default function KYCReviewPage() {
           </thead>
           <tbody>
             {submissions.map((kyc) => {
-              const user = getUserById(kyc.userId);
               return (
                 <tr key={kyc.id}>
                   <td>
                     <div className="flex items-center gap-3">
-                      <img
-                        src={user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.fullName}`}
-                        alt={user?.fullName}
-                        className="w-10 h-10 rounded-full"
-                      />
                       <div>
-                        <p className="font-medium">{user?.fullName}</p>
-                        <p className="text-xs text-muted-foreground">{user?.email}</p>
+                        <p className="font-medium">User {kyc.userId}</p>
                       </div>
                     </div>
                   </td>
@@ -252,7 +245,6 @@ export default function KYCReviewPage() {
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           {selectedKYC && (() => {
-            const user = getUserById(selectedKYC.userId);
             return (
               <>
                 <DialogHeader>
@@ -265,15 +257,8 @@ export default function KYCReviewPage() {
                 <div className="space-y-6 py-4">
                   {/* User Info */}
                   <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/50">
-                    <img
-                      src={user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.fullName}`}
-                      alt={user?.fullName}
-                      className="w-16 h-16 rounded-full"
-                    />
                     <div>
-                      <h3 className="font-semibold text-lg">{user?.fullName}</h3>
-                      <p className="text-sm text-muted-foreground">{user?.email}</p>
-                      <p className="text-sm text-muted-foreground">{user?.phone}</p>
+                      <h3 className="font-semibold text-lg">User {selectedKYC.userId}</h3>
                     </div>
                   </div>
 

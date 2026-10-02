@@ -12,7 +12,7 @@ import {
   PageHeader,
 } from '@/components/ui/dashboard-components';
 import { DashboardKPIs, ChartDataPoint, KYCSubmission, Transaction } from '@/types';
-import { formatCurrency, formatDateTime, getUserById } from '@/data/mockData';
+import { formatCurrency, formatDateTime } from '@/utils/format';
 import {
   Users,
   UserCheck,
@@ -246,7 +246,6 @@ export default function DashboardOverview() {
               </p>
             ) : (
               recentKYC.map((kyc) => {
-                const user = getUserById(kyc.userId);
                 return (
                   <motion.div
                     key={kyc.id}
@@ -255,13 +254,8 @@ export default function DashboardOverview() {
                     className="flex items-center justify-between p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <img
-                        src={user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.fullName}`}
-                        alt={user?.fullName}
-                        className="w-10 h-10 rounded-full"
-                      />
                       <div>
-                        <p className="font-medium text-sm">{user?.fullName}</p>
+                        <p className="font-medium text-sm">User {kyc.userId}</p>
                         <p className="text-xs text-muted-foreground flex items-center gap-1">
                           <Clock className="w-3 h-3" />
                           {formatDateTime(kyc.submittedAt)}
@@ -287,7 +281,6 @@ export default function DashboardOverview() {
         >
           <div className="space-y-4">
             {recentTransactions.map((txn) => {
-              const user = getUserById(txn.userId);
               return (
                 <motion.div
                   key={txn.id}
@@ -313,7 +306,7 @@ export default function DashboardOverview() {
                     </div>
                     <div>
                       <p className="font-medium text-sm capitalize">{txn.type}</p>
-                      <p className="text-xs text-muted-foreground">{user?.fullName}</p>
+                      <p className="text-xs text-muted-foreground">User {txn.userId}</p>
                     </div>
                   </div>
                   <div className="text-right">

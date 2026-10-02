@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { usersService } from '@/services/api';
 import { User, KYCStatus } from '@/types';
-import { formatDate, getWalletByUserId, getSavingsByUserId, getThriftsByUserId } from '@/data/mockData';
+import { formatDate } from '@/utils/format';
 import {
   PageHeader,
   StatusBadge,
@@ -138,11 +138,17 @@ export default function UsersPage() {
               >
                 <td>
                   <div className="flex items-center gap-3">
-                    <img
-                      src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`}
-                      alt={user.fullName}
-                      className="w-10 h-10 rounded-full"
-                    />
+                    {user.avatar ? (
+                      <img
+                        src={user.avatar}
+                        alt={user.fullName}
+                        className="h-10 w-10 rounded-full"
+                      />
+                    ) : (
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-sm font-semibold">
+                        {user.fullName.slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
                     <div>
                       <p className="font-medium">{user.fullName}</p>
                       <p className="text-xs text-muted-foreground">{user.id}</p>
@@ -178,11 +184,17 @@ export default function UsersPage() {
             <>
               <SheetHeader>
                 <div className="flex items-center gap-4">
-                  <img
-                    src={selectedUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedUser.fullName}`}
-                    alt={selectedUser.fullName}
-                    className="w-16 h-16 rounded-full"
-                  />
+                  {selectedUser.avatar ? (
+                    <img
+                      src={selectedUser.avatar}
+                      alt={selectedUser.fullName}
+                      className="h-16 w-16 rounded-full"
+                    />
+                  ) : (
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted text-lg font-semibold">
+                      {selectedUser.fullName.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
                   <div>
                     <SheetTitle>{selectedUser.fullName}</SheetTitle>
                     <SheetDescription>{selectedUser.id}</SheetDescription>
@@ -223,109 +235,9 @@ export default function UsersPage() {
                   </div>
                 </div>
 
-                {/* Wallet */}
-                {(() => {
-                  const wallet = getWalletByUserId(selectedUser.id);
-                  if (wallet) {
-                    return (
-                      <div className="space-y-4">
-                        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                          Wallet
-                        </h4>
-                        <div className="p-4 rounded-lg bg-muted/50 flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                            <Wallet className="w-6 h-6 text-primary" />
-                          </div>
-                          <div>
-                            <p className="text-2xl font-bold">
-                              ₦{wallet.balance.toLocaleString()}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              Available Balance
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
-
-                {/* Savings */}
-                {(() => {
-                  const savings = getSavingsByUserId(selectedUser.id);
-                  if (savings.length > 0) {
-                    return (
-                      <div className="space-y-4">
-                        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                          Savings Plans ({savings.length})
-                        </h4>
-                        <div className="space-y-3">
-                          {savings.map((plan) => (
-                            <div
-                              key={plan.id}
-                              className="p-4 rounded-lg bg-muted/50 flex items-center gap-4"
-                            >
-                              <div className="w-10 h-10 rounded-full bg-success-light flex items-center justify-center">
-                                <PiggyBank className="w-5 h-5 text-success" />
-                              </div>
-                              <div className="flex-1">
-                                <p className="font-medium text-sm">{plan.name}</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                                    <div
-                                      className="h-full bg-success rounded-full"
-                                      style={{
-                                        width: `${(plan.currentAmount / plan.targetAmount) * 100}%`,
-                                      }}
-                                    />
-                                  </div>
-                                  <span className="text-xs text-muted-foreground">
-                                    {Math.round((plan.currentAmount / plan.targetAmount) * 100)}%
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
-
-                {/* Thrifts */}
-                {(() => {
-                  const thrifts = getThriftsByUserId(selectedUser.id);
-                  if (thrifts.length > 0) {
-                    return (
-                      <div className="space-y-4">
-                        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                          Thrift Plans ({thrifts.length})
-                        </h4>
-                        <div className="space-y-3">
-                          {thrifts.map((plan) => (
-                            <div
-                              key={plan.id}
-                              className="p-4 rounded-lg bg-muted/50 flex items-center gap-4"
-                            >
-                              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                <UsersRound className="w-5 h-5 text-primary" />
-                              </div>
-                              <div>
-                                <p className="font-medium text-sm">{plan.name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {plan.memberCount} members • ₦{plan.contributionAmount.toLocaleString()} {plan.frequency}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
+                <p className="text-sm text-muted-foreground">
+                  Wallet, savings, and thrift details are not included in the documented user-role response.
+                </p>
               </div>
             </>
           )}

@@ -1,917 +1,773 @@
-// PAVE Admin - API Service Layer
-// This layer abstracts API calls and can be switched from mock to real API
-
-import {
-  AdminUser,
-  User,
-  KYCSubmission,
-  Wallet,
-  Transaction,
-  SavingsPlan,
-  ThriftPlan,
+import type {
+  AdminRole,
   ActivityLog,
-  DashboardKPIs,
-  ChartDataPoint,
-  ApiResponse,
-  PaginatedResponse,
-  UserFilters,
-  TransactionFilters,
-  KYCStatus,
-  CreateAdminAccountInput,
-  CreateAdminAccountResponse,
-  AdminPendingKycUser,
-  AdminKycApprovalResponse,
-  AdminUserDetails,
-  AdminUserTransaction,
   AdminBlockUserResponse,
+  AdminKycApprovalResponse,
+  AdminPendingKycUser,
   AdminTransaction,
   AdminTransactionsResponse,
+  AdminUserDetails,
   AdminUserRole,
-} from '@/types';
+  AdminUserTransaction,
+  ApiResponse,
+  CreateAdminAccountInput,
+  CreateAdminAccountResponse,
+  DashboardKPIs,
+  KYCStatus,
+  PaginatedResponse,
+  SavingsPlan,
+  ThriftPlan,
+  Transaction,
+  TransactionFilters,
+  User,
+  UserFilters,
+  Wallet,
+} from "@/types";
 
-import {
-  mockAdminUsers,
-  mockUsers,
-  mockKYCSubmissions,
-  mockWallets,
-  mockTransactions,
-  mockSavingsPlans,
-  mockThriftPlans,
-  mockActivityLogs,
-  mockDashboardKPIs,
-  mockTransactionVolumeData,
-  mockSavingsVolumeData,
-} from '@/data/mockData';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") || "";
 
-// Configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-const USE_MOCK_DATA = !API_BASE_URL || API_BASE_URL === '';
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
 
-// Simulate network delay for mock data
-const simulateDelay = (ms: number = 500): Promise<void> => {
-  return new Promise(resolve => setTimeout(resolve, ms));
-};
+const responseMessage = (body: unknown, fallback: string) =>
+  isRecord(body) && typeof body.message === "string" ? body.message : fallback;
 
-const getStoredToken = (): string | undefined => {
-  const token = localStorage.getItem('pave_admin_token');
+function failedResponse<T>(response: ApiResponse<unknown>): ApiResponse<T> {
+  return {
+    success: false,
+    error: response.error,
+    message: response.message,
+  };
+}
+
+function getStoredToken(): string | undefined {
+  const token = localStorage.getItem("pave_admin_token");
   if (token) return token;
 
-  const storedAuth = localStorage.getItem('pave_admin_auth');
+  const storedAuth = localStorage.getItem("pave_admin_auth");
   if (!storedAuth) return undefined;
 
   try {
-    const parsed = JSON.parse(storedAuth) as { token?: unknown };
-    return typeof parsed.token === 'string' ? parsed.token : undefined;
+    const parsed: unknown = JSON.parse(storedAuth);
+    return isRecord(parsed) && typeof parsed.token === "string"
+      ? parsed.token
+      : undefined;
   } catch {
     return undefined;
   }
-};
+}
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-const getResponseMessage = (value: unknown, fallback: string): string =>
-  isRecord(value) && typeof value.message === 'string' ? value.message : fallback;
-
-// Generic API fetch wrapper
-async function apiFetch<T>(
+async function requestApi(
   endpoint: string,
-  options?: RequestInit
-): Promise<ApiResponse<T>> {
-  if (USE_MOCK_DATA) {
-    await simulateDelay(300);
-    return { success: true, data: undefined };
+  options?: RequestInit,
+): Promise<ApiResponse<unknown>> {
+  if (!API_BASE_URL) {
+    return {
+      success: false,
+      error: "VITE_API_BASE_URL is not configured.",
+    };
   }
 
   try {
     const token = getStoredToken();
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options?.headers,
       },
-      ...options,
     });
-
-    const contentType = response.headers.get('content-type') || '';
-    const data: unknown = contentType.includes('application/json')
+    const contentType = response.headers.get("content-type") || "";
+    const body: unknown = contentType.includes("application/json")
       ? await response.json()
       : undefined;
 
     if (!response.ok) {
       return {
         success: false,
-        error: getResponseMessage(data, `Request failed (${response.status})`),
+        error: responseMessage(body, `Request failed (${response.status})`),
       };
     }
-
-    if (isRecord(data) && data.success === false) {
-      return { success: false, error: getResponseMessage(data, 'Request failed') };
+    if (isRecord(body) && body.success === false) {
+      return { success: false, error: responseMessage(body, "Request failed") };
     }
 
-    if (isRecord(data) && 'data' in data) {
-      return {
-        success: true,
-        data: data.data as T,
-        message: getResponseMessage(data, ''),
-      };
-    }
-
-    return { success: true, data: data as T, message: getResponseMessage(data, '') };
+    return {
+      success: true,
+      data: body,
+      message: responseMessage(body, ""),
+    };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Network error',
+      error: error instanceof Error ? error.message : "Network error",
     };
   }
 }
 
-// Auth Service
-export const authService = {
-  async login(email: string, password: string): Promise<ApiResponse<AdminUser>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(800);
-      const admin = mockAdminUsers.find(a => a.email === email);
-      if (admin && password === 'admin123') {
-        return { success: true, data: admin };
-      }
-      return { success: false, error: 'Invalid email or password' };
-    }
-    const response = await apiFetch<Record<string, unknown>>('/api/v1/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
+async function apiFetch<T>(
+  endpoint: string,
+  options?: RequestInit,
+): Promise<ApiResponse<T>> {
+  const response = await requestApi(endpoint, options);
+  if (!response.success) return failedResponse<T>(response);
+  const body = response.data;
 
+  return {
+    ...response,
+    data: (isRecord(body) && "data" in body ? body.data : body) as T,
+  };
+}
+
+async function apiFetchRaw<T>(
+  endpoint: string,
+  options?: RequestInit,
+): Promise<ApiResponse<T>> {
+  const response = await requestApi(endpoint, options);
+  return response.success
+    ? { ...response, data: response.data as T }
+    : failedResponse<T>(response);
+}
+
+function unavailable<T>(capability: string): ApiResponse<T> {
+  return {
+    success: false,
+    error: `The documented API collection does not provide ${capability}.`,
+  };
+}
+
+function mapAdminRole(value: unknown): AdminUserRole | undefined {
+  if (!isRecord(value)) return undefined;
+  if (
+    typeof value._id !== "string" ||
+    typeof value.email !== "string" ||
+    typeof value.role !== "string"
+  ) {
+    return undefined;
+  }
+
+  return {
+    _id: value._id,
+    email: value.email,
+    role: value.role,
+    firstName: typeof value.firstName === "string" ? value.firstName : "",
+    lastName: typeof value.lastName === "string" ? value.lastName : "",
+    isBlocked: value.isBlocked === true,
+    ...(typeof value.wallet === "string" || typeof value.wallet === "number"
+      ? { wallet: String(value.wallet) }
+      : {}),
+  };
+}
+
+function mapVendingPoints(value: unknown): AdminVendingPoint[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const points = value.map((point): AdminVendingPoint | undefined => {
+    if (
+      !isRecord(point) ||
+      typeof point.totalAmount !== "number" ||
+      typeof point.totalUnits !== "number"
+    ) {
+      return undefined;
+    }
+    return {
+      totalAmount: point.totalAmount,
+      totalUnits: point.totalUnits,
+      ...(typeof point.date === "string" ? { date: point.date } : {}),
+      ...(typeof point.week === "string" ? { week: point.week } : {}),
+      ...(typeof point.month === "string" ? { month: point.month } : {}),
+      ...(typeof point.year === "string" ? { year: point.year } : {}),
+    };
+  });
+  return points.some((point) => !point)
+    ? undefined
+    : points.filter((point): point is AdminVendingPoint => point !== undefined);
+}
+
+function mapAdminTransaction(value: unknown): AdminTransaction | undefined {
+  if (
+    !isRecord(value) ||
+    typeof value._id !== "string" ||
+    typeof value.amount !== "number" ||
+    typeof value.reference !== "string" ||
+    typeof value.status !== "string" ||
+    typeof value.createdAt !== "string"
+  ) {
+    return undefined;
+  }
+  const userId =
+    typeof value.userId === "string"
+      ? value.userId
+      : isRecord(value.userId) && typeof value.userId._id === "string"
+        ? {
+            _id: value.userId._id,
+            ...(typeof value.userId.email === "string" ? { email: value.userId.email } : {}),
+            ...(typeof value.userId.fullName === "string" ? { fullName: value.userId.fullName } : {}),
+            ...(typeof value.userId.firstName === "string" ? { firstName: value.userId.firstName } : {}),
+            ...(typeof value.userId.lastName === "string" ? { lastName: value.userId.lastName } : {}),
+            ...(typeof value.userId.phoneNumber === "string" ? { phoneNumber: value.userId.phoneNumber } : {}),
+          }
+        : undefined;
+  if (userId === undefined) return undefined;
+  return {
+    _id: value._id,
+    userId,
+    amount: value.amount,
+    reference: value.reference,
+    status: value.status,
+    createdAt: value.createdAt,
+    ...(typeof value.description === "string" ? { description: value.description } : {}),
+    ...(typeof value.type === "string" ? { type: value.type } : {}),
+    ...(typeof value.updatedAt === "string" ? { updatedAt: value.updatedAt } : {}),
+    ...(typeof value.meterNumber === "string" ? { meterNumber: value.meterNumber } : {}),
+    ...(typeof value.meterAccountNumber === "string" ? { meterAccountNumber: value.meterAccountNumber } : {}),
+    ...(typeof value.tariff === "string" ? { tariff: value.tariff } : {}),
+    ...(typeof value.vendType === "string" ? { vendType: value.vendType } : {}),
+    ...(typeof value.subclass === "string" ? { subclass: value.subclass } : {}),
+    ...(typeof value.vendTime === "string" ? { vendTime: value.vendTime } : {}),
+    ...(typeof value.unitsActual === "number" ? { unitsActual: value.unitsActual } : {}),
+    ...(typeof value.unitName === "string" ? { unitName: value.unitName } : {}),
+    ...(typeof value.transactionFees === "number" ? { transactionFees: value.transactionFees } : {}),
+    ...(typeof value.vendorTransactionFees === "number" ? { vendorTransactionFees: value.vendorTransactionFees } : {}),
+    ...(typeof value.clientTransactionFees === "number" ? { clientTransactionFees: value.clientTransactionFees } : {}),
+    ...(typeof value.vat === "number" ? { vat: value.vat } : {}),
+    ...(typeof value.tokenHex === "string" ? { tokenHex: value.tokenHex } : {}),
+    ...(typeof value.tokenDec === "string" ? { tokenDec: value.tokenDec } : {}),
+  };
+}
+
+export interface AdminDashboardTotals {
+  totalWalletBalance?: number;
+  totalSavings?: number;
+}
+
+export interface AdminUserStatistics {
+  totalUsers: number;
+  activeUsersLast24Hours: number;
+  registrations: number;
+}
+
+export interface AdminDailyRegistration {
+  date: string;
+  registrations: number;
+  names?: string[];
+}
+
+export interface AdminRetentionStatistics {
+  dailyActiveUsers: number;
+  monthlyActiveUsers: number;
+  retentionRate: number;
+}
+
+export interface AdminCohort {
+  cohort: string;
+  totalRegistered: number;
+  activeUsersInCohort: number;
+}
+
+export interface AdminVendingPoint {
+  totalAmount: number;
+  totalUnits: number;
+  date?: string;
+  week?: string;
+  month?: string;
+  year?: string;
+}
+
+export interface AdminVendingGraph {
+  daily: AdminVendingPoint[];
+  weekly: AdminVendingPoint[];
+  monthly: AdminVendingPoint[];
+  yearly: AdminVendingPoint[];
+}
+
+export interface AdminYearlyVending {
+  summary: {
+    totalAmount: number;
+    totalUnits: number;
+    count: number;
+  };
+  data: AdminTransaction[];
+}
+
+export interface AdminLeaderboard {
+  topByAmount: AdminLeaderboardEntry[];
+  topByUnits: AdminLeaderboardEntry[];
+  topByTransactions: AdminLeaderboardEntry[];
+}
+
+export interface AdminLeaderboardEntry {
+  totalAmount: number;
+  totalUnits: number;
+  transactionCount: number;
+  userId: string;
+  fullName: string;
+  email: string;
+}
+
+export interface AdminSystemHealth {
+  system: Record<string, unknown>;
+  revenue: Record<string, unknown>;
+  performance: Record<string, unknown>;
+}
+
+export interface AdminSavingsGroup {
+  id: string;
+  userId: string;
+  name: string;
+  description: string;
+  image: string;
+  targetAmount: number;
+  contributionAmount: number;
+  currentBalance: number;
+  currency: string;
+  frequency: string;
+  maxMembers: number;
+  currentMembers: number;
+  startDate: string;
+  endDate: string;
+  visibility: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface CreateAdminSavingsGroupInput {
+  name: string;
+  description: string;
+  targetAmount: number;
+  contributionAmount: number;
+  currency: string;
+  frequency: string;
+  maxMembers: number;
+  startDate: string;
+  endDate: string;
+  visibility: string;
+  image: string;
+}
+
+export const authService = {
+  async login(email: string, password: string) {
+    const response = await apiFetch<Record<string, unknown>>(
+      "/api/v1/auth/login",
+      { method: "POST", body: JSON.stringify({ email, password }) },
+    );
     if (!response.success || !response.data) {
-      return { success: false, error: response.error || 'Login failed' };
+      return { success: false as const, error: response.error || "Login failed" };
     }
 
     const payload = response.data;
     const user = isRecord(payload.user) ? payload.user : payload;
-    const id = typeof user.id === 'string' ? user.id : user._id;
-    const firstName = typeof user.firstName === 'string' ? user.firstName : '';
-    const lastName = typeof user.lastName === 'string' ? user.lastName : '';
-    const name =
-      typeof user.name === 'string'
-        ? user.name
-        : `${firstName} ${lastName}`.trim();
-    const role =
-      user.role === 'superadmin' ? 'super_admin' : user.role;
-
+    const id = typeof user.id === "string" ? user.id : user._id;
+    const role: AdminRole | undefined =
+      user.role === "superadmin" || user.role === "super_admin"
+        ? "super_admin"
+        : user.role === "admin"
+          ? "admin"
+          : undefined;
     if (
-      typeof id !== 'string' ||
-      typeof user.email !== 'string' ||
-      typeof role !== 'string' ||
-      (role !== 'admin' && role !== 'super_admin')
+      typeof id !== "string" ||
+      typeof user.email !== "string" ||
+      (role !== "admin" && role !== "super_admin")
     ) {
       return {
-        success: false,
-        error: 'The login response did not contain a valid admin account.',
+        success: false as const,
+        error: "The login response did not contain a valid admin account.",
       };
     }
 
     const token =
-      typeof payload.token === 'string'
+      typeof payload.token === "string"
         ? payload.token
-        : typeof payload.accessToken === 'string'
+        : typeof payload.accessToken === "string"
           ? payload.accessToken
           : undefined;
-
     return {
-      success: true,
+      success: true as const,
       data: {
         id,
-        name,
+        name:
+          typeof user.name === "string"
+            ? user.name
+            : `${typeof user.firstName === "string" ? user.firstName : ""} ${
+                typeof user.lastName === "string" ? user.lastName : ""
+              }`.trim(),
         email: user.email,
         role,
         createdAt:
-          typeof user.createdAt === 'string' ? user.createdAt : new Date().toISOString(),
+          typeof user.createdAt === "string" ? user.createdAt : "",
         ...(token ? { token } : {}),
       },
       message: response.message,
     };
   },
-
-  async forgotPassword(email: string): Promise<ApiResponse<{ message: string }>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(800);
-      const admin = mockAdminUsers.find(a => a.email === email);
-      if (admin) {
-        return { success: true, data: { message: 'Password reset link sent to your email' } };
-      }
-      return { success: false, error: 'Email not found' };
-    }
-    return apiFetch('/api/auth/forgot-password', {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-    });
+  async forgotPassword(_email: string) {
+    return unavailable<{ message: string }>("password reset");
   },
-
   async logout(): Promise<ApiResponse<void>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(300);
-      return { success: true };
-    }
-    return apiFetch('/api/auth/logout', { method: 'POST' });
+    return { success: true };
   },
 };
 
-// Admin Service
 export const adminService = {
-  async createAdminAccount(
-    input: CreateAdminAccountInput
-  ): Promise<ApiResponse<CreateAdminAccountResponse>> {
-    return apiFetch<CreateAdminAccountResponse>('/api/v1/admin/adminRegister', {
-      method: 'POST',
+  createAdminAccount(input: CreateAdminAccountInput) {
+    return apiFetch<CreateAdminAccountResponse>("/api/v1/admin/adminRegister", {
+      method: "POST",
       body: JSON.stringify(input),
     });
   },
-
-  async getPendingKyc(): Promise<ApiResponse<AdminPendingKycUser[]>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(500);
-      const data = mockKYCSubmissions
-        .filter(submission => submission.status === 'pending')
-        .map(submission => {
-          const user = mockUsers.find(candidate => candidate.id === submission.userId);
-          if (!user) {
-            throw new Error(`Mock user ${submission.userId} for pending KYC was not found`);
-          }
-
-          const [firstName, ...lastNameParts] = user.fullName.split(' ');
-          return {
-            id: user.id,
-            firstName,
-            lastName: lastNameParts.join(' '),
-            email: user.email,
-            phoneNumber: user.phone,
-            nin: submission.nin,
-            isKycVerified: false,
-            kycStatus: 'pending' as const,
-            createdAt: submission.submittedAt,
-          };
-        });
-
-      return { success: true, data };
-    }
-
-    return apiFetch<AdminPendingKycUser[]>('/api/v1/admin/getAllPendingKyc');
+  getPendingKyc() {
+    return apiFetch<AdminPendingKycUser[]>("/api/v1/admin/getAllPendingKyc");
   },
-
-  async approveKyc(userId: string): Promise<ApiResponse<AdminKycApprovalResponse>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(600);
-      const submission = mockKYCSubmissions.find(
-        item => item.userId === userId && item.status === 'pending',
-      );
-      const user = mockUsers.find(item => item.id === userId);
-
-      if (!submission || !user) {
-        return { success: false, error: 'Pending KYC submission not found' };
-      }
-
-      submission.status = 'approved';
-      submission.reviewedAt = new Date().toISOString();
-      user.kycStatus = 'approved';
-      user.walletEnabled = true;
-
-      return {
-        success: true,
-        data: { id: user.id, isKycVerified: true, kycStatus: 'approved' },
-      };
-    }
-
+  approveKyc(userId: string) {
     return apiFetch<AdminKycApprovalResponse>(
       `/api/v1/admin/adminApprovedKyc/${encodeURIComponent(userId)}`,
-      { method: 'PUT' },
+      { method: "PUT" },
     );
   },
-
-  async getUserDetails(email: string): Promise<ApiResponse<AdminUserDetails>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(400);
-      const user = mockUsers.find(candidate => candidate.email === email);
-      if (!user) {
-        return { success: false, error: 'User details not found' };
-      }
-
-      return {
-        success: true,
-        data: {
-          id: user.id,
-          fullName: user.fullName,
-          email: user.email,
-          phone: user.phone,
-          balance: mockWallets.find(wallet => wallet.userId === user.id)?.balance ?? 0,
-          accountName: null,
-          accountNumber: null,
-          signUpOn: user.createdAt,
-          lastLogin: null,
-          address: null,
-          status: user.walletEnabled ? 'Active' : 'Inactive',
-          isBlocked: false,
-        },
-      };
-    }
-
+  getUserDetails(email: string) {
     const params = new URLSearchParams({ email });
     return apiFetch<AdminUserDetails>(
       `/api/v1/admin/viewUserDetails?${params.toString()}`,
     );
   },
-
-  async getUserTransactions(
-    email: string,
-  ): Promise<ApiResponse<AdminUserTransaction[]>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(400);
-      const user = mockUsers.find(candidate => candidate.email === email);
-      if (!user) {
-        return { success: false, error: 'User transactions not found' };
-      }
-
-      return {
-        success: true,
-        data: mockTransactions
-          .filter(transaction => transaction.userId === user.id)
-          .map(transaction => ({
-            _id: transaction.id,
-            userId: transaction.userId,
-            amount: transaction.amount,
-            reference: transaction.reference,
-            status: transaction.status,
-            description: transaction.description,
-            type: transaction.type,
-            createdAt: transaction.createdAt,
-          })),
-      };
-    }
-
+  getUserTransactions(email: string) {
     const params = new URLSearchParams({ email });
     return apiFetch<AdminUserTransaction[]>(
       `/api/v1/admin/viewUserTransactions?${params.toString()}`,
     );
   },
-
-  async blockUser(email: string): Promise<ApiResponse<AdminBlockUserResponse>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(500);
-      const user = mockUsers.find(candidate => candidate.email === email);
-      if (!user) {
-        return { success: false, error: 'User not found' };
-      }
-
-      user.walletEnabled = false;
-      return {
-        success: true,
-        data: {
-          id: user.id,
-          fullName: user.fullName,
-          email: user.email,
-          isBlocked: true,
-          statusMessage: 'Blocked',
-        },
-      };
-    }
-
+  blockUser(email: string) {
     const params = new URLSearchParams({ email });
     return apiFetch<AdminBlockUserResponse>(
       `/api/v1/admin/blockUser?${params.toString()}`,
-      { method: 'POST' },
+      { method: "POST" },
     );
   },
-
-  async searchTransactionsByMeter(
-    meterNumber: string,
-  ): Promise<ApiResponse<AdminTransaction[]>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(400);
-      const needle = meterNumber.trim().toLowerCase();
+  async getAllTransactions(): Promise<ApiResponse<AdminTransactionsResponse>> {
+    const response = await apiFetchRaw<unknown>(
+      "/api/v1/admin/adminViewAllTransactions",
+    );
+    if (!response.success) return failedResponse<AdminTransactionsResponse>(response);
+    if (!isRecord(response.data)) {
+      return { success: false, error: "The all-transactions response was malformed." };
+    }
+    const { totalTransactions, data } = response.data;
+    if (typeof totalTransactions !== "number" || !Array.isArray(data)) {
       return {
-        success: true,
-        data: mockTransactions
-          .filter(transaction =>
-            `${transaction.reference} ${transaction.description || ''}`.toLowerCase().includes(needle),
-          )
-          .map(transaction => ({
-            _id: transaction.id,
-            userId: transaction.userId,
-            amount: transaction.amount,
-            reference: transaction.reference,
-            status: transaction.status,
-            description: transaction.description,
-            type: transaction.type,
-            createdAt: transaction.createdAt,
-          })),
+        success: false,
+        error: "The all-transactions response did not match the documented shape.",
       };
     }
-
+    return {
+      ...response,
+      data: { totalTransactions, data: data as AdminTransaction[] },
+    };
+  },
+  async searchTransactionsByMeter(meterNumber: string) {
     const params = new URLSearchParams({ meterNumber });
-    const response = await apiFetch<AdminTransaction[] | AdminTransaction>(
+    return apiFetch<unknown>(
       `/api/v1/admin/searchTransactions?${params.toString()}`,
     );
-    if (!response.success || !response.data) {
-      return { success: false, error: response.error, message: response.message };
-    }
-
-    return {
-      ...response,
-      data: Array.isArray(response.data) ? response.data : [response.data],
-    };
   },
-
-  async getAllTransactions(): Promise<ApiResponse<AdminTransactionsResponse>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(500);
-      return {
-        success: true,
-        data: {
-          totalTransactions: mockTransactions.length,
-          data: mockTransactions.map(transaction => ({
-            _id: transaction.id,
-            userId: transaction.userId,
-            amount: transaction.amount,
-            reference: transaction.reference,
-            status: transaction.status,
-            description: transaction.description,
-            type: transaction.type,
-            createdAt: transaction.createdAt,
-          })),
-        },
-      };
-    }
-
-    const response = await apiFetch<AdminTransaction[]>(
-      '/api/v1/admin/adminViewAllTransactions',
-    );
-    if (!response.success || !response.data) {
-      return { success: false, error: response.error, message: response.message };
-    }
-
-    return {
-      ...response,
-      data: {
-        totalTransactions: response.data.length,
-        data: response.data,
-      },
-    };
-  },
-
   async getAllUserRoles(): Promise<ApiResponse<AdminUserRole[]>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(400);
+    const response = await apiFetch<unknown>("/api/v1/admin/adminViewAllUserRoles");
+    if (!response.success) return failedResponse<AdminUserRole[]>(response);
+    if (!Array.isArray(response.data)) {
+      return { success: false, error: "The user-roles response was malformed." };
+    }
+    const users = response.data.map(mapAdminRole);
+    if (users.some((user) => !user)) {
       return {
-        success: true,
-        data: mockUsers.map(user => ({
-          _id: user.id,
-          firstName: user.fullName.split(' ')[0] || user.fullName,
-          lastName: user.fullName.split(' ').slice(1).join(' '),
-          email: user.email,
-          role: 'user',
-          isBlocked: !user.walletEnabled,
-          wallet: String(
-            mockWallets.find(wallet => wallet.userId === user.id)?.balance ?? 0,
-          ),
-        })),
+        success: false,
+        error: "The user-roles response did not match the documented shape.",
       };
     }
-
-    const response = await apiFetch<AdminUserRole[]>(
-      '/api/v1/admin/adminViewAllUserRoles',
-    );
-    if (!response.success || !response.data) return response;
-
-    return {
-      ...response,
-      data: response.data.map(user => ({
-        _id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-        isBlocked: user.isBlocked,
-        wallet: user.wallet,
-      })),
-    };
+    return { ...response, data: users as AdminUserRole[] };
   },
-
-  async getTransactionById(
-    transactionId: string,
-  ): Promise<ApiResponse<AdminTransaction>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(300);
-      const transaction = mockTransactions.find(item => item.id === transactionId);
-      if (!transaction) {
-        return { success: false, error: 'Transaction not found' };
-      }
-
-      return {
-        success: true,
-        data: {
-          _id: transaction.id,
-          userId: transaction.userId,
-          amount: transaction.amount,
-          reference: transaction.reference,
-          status: transaction.status,
-          description: transaction.description,
-          type: transaction.type,
-          createdAt: transaction.createdAt,
-        },
-      };
-    }
-
+  getTransactionById(transactionId: string) {
     return apiFetch<AdminTransaction>(
       `/api/v1/admin/adminViewTransactionById/${encodeURIComponent(transactionId)}`,
     );
   },
+  async getDashboardTotals(): Promise<ApiResponse<AdminDashboardTotals>> {
+    const response = await apiFetch<Record<string, unknown>>(
+      "/api/v1/admin/getAllTotalWalletBalance",
+    );
+    if (!response.success) return failedResponse<AdminDashboardTotals>(response);
+    if (!response.data) {
+      return { success: false, error: "The dashboard totals response was malformed." };
+    }
+    const totals: AdminDashboardTotals = {};
+    if (typeof response.data.totalWalletBalance === "number") {
+      totals.totalWalletBalance = response.data.totalWalletBalance;
+    }
+    if (typeof response.data.totalSavings === "number") {
+      totals.totalSavings = response.data.totalSavings;
+    }
+    return { ...response, data: totals };
+  },
+  async getTotalMembers(): Promise<ApiResponse<number>> {
+    const response = await apiFetch<unknown>(
+      "/api/v1/admin/getAllTotalMembers",
+    );
+    if (!response.success) return failedResponse<number>(response);
+    if (!isRecord(response.data) || typeof response.data.count !== "number") {
+      return {
+        success: false,
+        error: "The total-members response did not include a numeric count.",
+      };
+    }
+    return { ...response, data: response.data.count };
+  },
+  async getUserStatistics(): Promise<ApiResponse<AdminUserStatistics>> {
+    const response = await apiFetchRaw<unknown>("/api/v1/admin/user/stats");
+    if (!response.success || !isRecord(response.data) || !isRecord(response.data.stats)) {
+      return response.success
+        ? { success: false, error: "The user-statistics response was malformed." }
+        : failedResponse<AdminUserStatistics>(response);
+    }
+    const stats = response.data.stats;
+    if (
+      typeof stats.totalUsers !== "number" ||
+      typeof stats.activeUsersLast24Hours !== "number" ||
+      typeof stats.registrations !== "number"
+    ) {
+      return {
+        success: false,
+        error: "The user-statistics response did not match the documented shape.",
+      };
+    }
+    return {
+      ...response,
+      data: {
+        totalUsers: stats.totalUsers,
+        activeUsersLast24Hours: stats.activeUsersLast24Hours,
+        registrations: stats.registrations,
+      },
+    };
+  },
+  getDailyRegistrations() {
+    return apiFetch<AdminDailyRegistration[]>("/api/v1/admin/user/daily");
+  },
+  async getRetentionStatistics(): Promise<ApiResponse<AdminRetentionStatistics>> {
+    const response = await apiFetchRaw<unknown>("/api/v1/admin/getRetentionStats");
+    if (!response.success) return failedResponse<AdminRetentionStatistics>(response);
+    if (!isRecord(response.data)) {
+      return { success: false, error: "The retention response was malformed." };
+    }
+    const { dailyActiveUsers, monthlyActiveUsers, retentionRate } = response.data;
+    if (
+      typeof dailyActiveUsers !== "number" ||
+      typeof monthlyActiveUsers !== "number" ||
+      typeof retentionRate !== "number"
+    ) {
+      return {
+        success: false,
+        error: "The retention response did not match the documented shape.",
+      };
+    }
+    return {
+      ...response,
+      data: { dailyActiveUsers, monthlyActiveUsers, retentionRate },
+    };
+  },
+  getCohortAnalysis() {
+    return apiFetch<AdminCohort[]>("/api/v1/admin/getCohortAnalysis");
+  },
+  async getVendingGraph(): Promise<ApiResponse<AdminVendingGraph>> {
+    const response = await apiFetchRaw<unknown>("/api/v1/admin/vending/graph");
+    if (!response.success) return failedResponse<AdminVendingGraph>(response);
+    if (!isRecord(response.data)) {
+      return { success: false, error: "The vending graph response was malformed." };
+    }
+    const keys = ["daily", "weekly", "monthly", "yearly"] as const;
+    const points = keys.map((key) => mapVendingPoints(response.data[key]));
+    if (points.some((series) => !series)) {
+      return {
+        success: false,
+        error: "The vending graph response did not match the documented shape.",
+      };
+    }
+    return {
+      ...response,
+      data: {
+        daily: points[0] ?? [],
+        weekly: points[1] ?? [],
+        monthly: points[2] ?? [],
+        yearly: points[3] ?? [],
+      },
+    };
+  },
+  async getYearlyVending(): Promise<ApiResponse<AdminYearlyVending>> {
+    const response = await apiFetchRaw<unknown>("/api/v1/admin/vending/yearly");
+    if (
+      !response.success ||
+      !isRecord(response.data) ||
+      !isRecord(response.data.summary) ||
+      !Array.isArray(response.data.data)
+    ) {
+      return response.success
+        ? { success: false, error: "The yearly vending response was malformed." }
+        : failedResponse<AdminYearlyVending>(response);
+    }
+    const { summary } = response.data;
+    const rows = response.data.data.map(mapAdminTransaction);
+    if (
+      typeof summary.totalAmount !== "number" ||
+      typeof summary.totalUnits !== "number" ||
+      typeof summary.count !== "number" ||
+      rows.some((row) => !row)
+    ) {
+      return {
+        success: false,
+        error: "The yearly vending response did not match the documented shape.",
+      };
+    }
+    return {
+      ...response,
+      data: {
+        summary: {
+          totalAmount: summary.totalAmount,
+          totalUnits: summary.totalUnits,
+          count: summary.count,
+        },
+        data: rows.filter((row): row is AdminTransaction => row !== undefined),
+      },
+    };
+  },
+  async getLeaderboard(): Promise<ApiResponse<{ leaderboards: AdminLeaderboard }>> {
+    const response = await apiFetchRaw<unknown>("/api/v1/admin/getUserLeaderboard");
+    if (
+      !response.success ||
+      !isRecord(response.data) ||
+      !isRecord(response.data.leaderboards)
+    ) {
+      return response.success
+        ? { success: false, error: "The leaderboard response was malformed." }
+        : failedResponse<{ leaderboards: AdminLeaderboard }>(response);
+    }
+    const keys = ["topByAmount", "topByUnits", "topByTransactions"] as const;
+    const parsed: AdminLeaderboard = {
+      topByAmount: [],
+      topByUnits: [],
+      topByTransactions: [],
+    };
+    for (const key of keys) {
+      const rows = response.data.leaderboards[key];
+      if (!Array.isArray(rows)) {
+        return {
+          success: false,
+          error: "The leaderboard response did not match the documented shape.",
+        };
+      }
+      const mapped = rows.map((row): AdminLeaderboardEntry | undefined => {
+        if (
+          !isRecord(row) ||
+          typeof row.totalAmount !== "number" ||
+          typeof row.totalUnits !== "number" ||
+          typeof row.transactionCount !== "number" ||
+          typeof row.userId !== "string" ||
+          typeof row.fullName !== "string" ||
+          typeof row.email !== "string"
+        ) {
+          return undefined;
+        }
+        return {
+          totalAmount: row.totalAmount,
+          totalUnits: row.totalUnits,
+          transactionCount: row.transactionCount,
+          userId: row.userId,
+          fullName: row.fullName,
+          email: row.email,
+        };
+      });
+      if (mapped.some((row) => !row)) {
+        return {
+          success: false,
+          error: "A leaderboard row did not match the documented shape.",
+        };
+      }
+      parsed[key] = mapped.filter(
+        (row): row is AdminLeaderboardEntry => row !== undefined,
+      );
+    }
+    return {
+      ...response,
+      data: { leaderboards: parsed },
+    };
+  },
+  getSystemHealthSummary() {
+    return apiFetch<AdminSystemHealth>("/api/v1/admin/getSystemHealthSummary");
+  },
+  getSavingsGroups() {
+    return apiFetch<AdminSavingsGroup[]>("/api/v1/group-saving/get-all-groups");
+  },
+  createSavingsGroup(input: CreateAdminSavingsGroupInput) {
+    return apiFetch<AdminSavingsGroup>("/api/v1/group-saving/create-group", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
 };
 
-// Dashboard Service
 export const dashboardService = {
-  async getKPIs(): Promise<ApiResponse<DashboardKPIs>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(500);
-      return { success: true, data: mockDashboardKPIs };
-    }
-    return apiFetch('/api/dashboard/kpis');
-  },
-
-  async getTransactionVolumeChart(): Promise<ApiResponse<ChartDataPoint[]>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(400);
-      return { success: true, data: mockTransactionVolumeData };
-    }
-    return apiFetch('/api/dashboard/charts/transaction-volume');
-  },
-
-  async getSavingsVolumeChart(): Promise<ApiResponse<ChartDataPoint[]>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(400);
-      return { success: true, data: mockSavingsVolumeData };
-    }
-    return apiFetch('/api/dashboard/charts/savings-volume');
-  },
-
-  async getRecentActivity(): Promise<ApiResponse<ActivityLog[]>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(400);
-      return { success: true, data: mockActivityLogs.slice(0, 5) };
-    }
-    return apiFetch('/api/dashboard/recent-activity');
-  },
+  getKPIs: () => unavailable<DashboardKPIs>("the legacy dashboard KPI endpoint"),
+  getTransactionVolumeChart: () =>
+    unavailable<{ date: string; value: number }[]>("the legacy transaction chart endpoint"),
+  getSavingsVolumeChart: () =>
+    unavailable<{ date: string; value: number }[]>("the legacy savings chart endpoint"),
+  getRecentActivity: () => unavailable<ActivityLog[]>("an admin activity feed"),
 };
 
-// Users Service
 export const usersService = {
-  async getUsers(
-    page: number = 1,
-    limit: number = 10,
-    filters?: UserFilters
-  ): Promise<ApiResponse<PaginatedResponse<User>>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(500);
-      let filtered = [...mockUsers];
-      
-      if (filters?.search) {
-        const search = filters.search.toLowerCase();
-        filtered = filtered.filter(
-          u => u.fullName.toLowerCase().includes(search) ||
-               u.email.toLowerCase().includes(search)
-        );
-      }
-      
-      if (filters?.kycStatus && filters.kycStatus !== 'all') {
-        filtered = filtered.filter(u => u.kycStatus === filters.kycStatus);
-      }
-
-      const total = filtered.length;
-      const start = (page - 1) * limit;
-      const data = filtered.slice(start, start + limit);
-
-      return {
-        success: true,
-        data: {
-          data,
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-        },
-      };
-    }
-    const params = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-      ...filters,
-    });
-    return apiFetch(`/api/users?${params}`);
-  },
-
-  async getUserById(id: string): Promise<ApiResponse<User>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(300);
-      const user = mockUsers.find(u => u.id === id);
-      if (user) {
-        return { success: true, data: user };
-      }
-      return { success: false, error: 'User not found' };
-    }
-    return apiFetch(`/api/users/${id}`);
-  },
+  getUsers: (_page?: number, _limit?: number, _filters?: UserFilters) =>
+    unavailable<PaginatedResponse<User>>("the legacy paginated users endpoint"),
+  getUserById: (_id: string) => unavailable<User>("the legacy user-by-id endpoint"),
 };
 
-// KYC Service
 export const kycService = {
-  async getSubmissions(
-    status?: KYCStatus | 'all',
-    page: number = 1,
-    limit: number = 10
-  ): Promise<ApiResponse<PaginatedResponse<KYCSubmission>>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(500);
-      let filtered = [...mockKYCSubmissions];
-      
-      if (status && status !== 'all') {
-        filtered = filtered.filter(k => k.status === status);
-      }
-
-      const total = filtered.length;
-      const start = (page - 1) * limit;
-      const data = filtered.slice(start, start + limit);
-
-      return {
-        success: true,
-        data: {
-          data,
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-        },
-      };
-    }
-    const params = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-      ...(status && status !== 'all' ? { status } : {}),
-    });
-    return apiFetch(`/api/kyc?${params}`);
-  },
-
-  async getSubmissionById(id: string): Promise<ApiResponse<KYCSubmission>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(300);
-      const submission = mockKYCSubmissions.find(k => k.id === id);
-      if (submission) {
-        return { success: true, data: submission };
-      }
-      return { success: false, error: 'KYC submission not found' };
-    }
-    return apiFetch(`/api/kyc/${id}`);
-  },
-
-  async approveKYC(id: string): Promise<ApiResponse<KYCSubmission>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(600);
-      const idx = mockKYCSubmissions.findIndex(k => k.id === id);
-      if (idx !== -1) {
-        mockKYCSubmissions[idx] = {
-          ...mockKYCSubmissions[idx],
-          status: 'approved',
-          reviewedAt: new Date().toISOString(),
-        };
-        return { success: true, data: mockKYCSubmissions[idx] };
-      }
-      return { success: false, error: 'KYC submission not found' };
-    }
-    return apiFetch(`/api/kyc/${id}/approve`, { method: 'POST' });
-  },
-
-  async rejectKYC(id: string, reason: string): Promise<ApiResponse<KYCSubmission>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(600);
-      const idx = mockKYCSubmissions.findIndex(k => k.id === id);
-      if (idx !== -1) {
-        mockKYCSubmissions[idx] = {
-          ...mockKYCSubmissions[idx],
-          status: 'rejected',
-          rejectionReason: reason,
-          reviewedAt: new Date().toISOString(),
-        };
-        return { success: true, data: mockKYCSubmissions[idx] };
-      }
-      return { success: false, error: 'KYC submission not found' };
-    }
-    return apiFetch(`/api/kyc/${id}/reject`, {
-      method: 'POST',
-      body: JSON.stringify({ reason }),
-    });
-  },
+  getSubmissions: (
+    _status?: KYCStatus | "all",
+    _page?: number,
+    _limit?: number,
+  ) => unavailable<PaginatedResponse<import("@/types").KYCSubmission>>(
+    "the legacy paginated KYC endpoint",
+  ),
+  getSubmissionById: (_id: string) =>
+    unavailable<import("@/types").KYCSubmission>("the legacy KYC-by-id endpoint"),
+  approveKYC: (_id: string) =>
+    unavailable<import("@/types").KYCSubmission>("the legacy KYC approval endpoint"),
+  rejectKYC: (_id: string, _reason: string) =>
+    unavailable<import("@/types").KYCSubmission>("KYC rejection"),
 };
 
-// Wallet Service
 export const walletService = {
-  async getWallets(
-    page: number = 1,
-    limit: number = 10
-  ): Promise<ApiResponse<PaginatedResponse<Wallet>>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(500);
-      const total = mockWallets.length;
-      const start = (page - 1) * limit;
-      const data = mockWallets.slice(start, start + limit);
-
-      return {
-        success: true,
-        data: {
-          data,
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-        },
-      };
-    }
-    const params = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-    });
-    return apiFetch(`/api/wallets?${params}`);
-  },
-
-  async blockWallet(id: string): Promise<ApiResponse<Wallet>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(600);
-      const idx = mockWallets.findIndex(w => w.id === id);
-      if (idx !== -1) {
-        mockWallets[idx] = {
-          ...mockWallets[idx],
-          status: 'blocked',
-          updatedAt: new Date().toISOString(),
-        };
-        return { success: true, data: mockWallets[idx] };
-      }
-      return { success: false, error: 'Wallet not found' };
-    }
-    return apiFetch(`/api/wallets/${id}/block`, { method: 'POST' });
-  },
-
-  async unblockWallet(id: string): Promise<ApiResponse<Wallet>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(600);
-      const idx = mockWallets.findIndex(w => w.id === id);
-      if (idx !== -1) {
-        mockWallets[idx] = {
-          ...mockWallets[idx],
-          status: 'enabled',
-          updatedAt: new Date().toISOString(),
-        };
-        return { success: true, data: mockWallets[idx] };
-      }
-      return { success: false, error: 'Wallet not found' };
-    }
-    return apiFetch(`/api/wallets/${id}/unblock`, { method: 'POST' });
-  },
+  getWallets: (_page?: number, _limit?: number) =>
+    unavailable<PaginatedResponse<Wallet>>("an admin wallet listing endpoint"),
+  blockWallet: (_id: string) => unavailable<Wallet>("wallet blocking by ID"),
+  unblockWallet: (_id: string) => unavailable<Wallet>("wallet unblocking"),
 };
 
-// Transaction Service
 export const transactionService = {
-  async getTransactions(
-    page: number = 1,
-    limit: number = 10,
-    filters?: TransactionFilters
-  ): Promise<ApiResponse<PaginatedResponse<Transaction>>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(500);
-      let filtered = [...mockTransactions];
-      
-      if (filters?.type && filters.type !== 'all') {
-        filtered = filtered.filter(t => t.type === filters.type);
-      }
-      
-      if (filters?.status && filters.status !== 'all') {
-        filtered = filtered.filter(t => t.status === filters.status);
-      }
-
-      const total = filtered.length;
-      const start = (page - 1) * limit;
-      const data = filtered.slice(start, start + limit);
-
-      return {
-        success: true,
-        data: {
-          data,
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-        },
-      };
-    }
-    const params = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-      ...filters,
-    });
-    return apiFetch(`/api/transactions?${params}`);
-  },
-
-  async getTransactionById(id: string): Promise<ApiResponse<Transaction>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(300);
-      const transaction = mockTransactions.find(t => t.id === id);
-      if (transaction) {
-        return { success: true, data: transaction };
-      }
-      return { success: false, error: 'Transaction not found' };
-    }
-    return apiFetch(`/api/transactions/${id}`);
-  },
+  getTransactions: (
+    _page?: number,
+    _limit?: number,
+    _filters?: TransactionFilters,
+  ) => unavailable<PaginatedResponse<Transaction>>("the legacy transaction listing endpoint"),
+  getTransactionById: (_id: string) =>
+    unavailable<Transaction>("the legacy transaction-by-id endpoint"),
 };
 
-// Savings Service
 export const savingsService = {
-  async getSavingsPlans(
-    page: number = 1,
-    limit: number = 10
-  ): Promise<ApiResponse<PaginatedResponse<SavingsPlan>>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(500);
-      const total = mockSavingsPlans.length;
-      const start = (page - 1) * limit;
-      const data = mockSavingsPlans.slice(start, start + limit);
-
-      return {
-        success: true,
-        data: {
-          data,
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-        },
-      };
-    }
-    const params = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-    });
-    return apiFetch(`/api/savings?${params}`);
-  },
-
-  async getSavingsPlanById(id: string): Promise<ApiResponse<SavingsPlan>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(300);
-      const plan = mockSavingsPlans.find(s => s.id === id);
-      if (plan) {
-        return { success: true, data: plan };
-      }
-      return { success: false, error: 'Savings plan not found' };
-    }
-    return apiFetch(`/api/savings/${id}`);
-  },
+  getSavingsPlans: (_page?: number, _limit?: number) =>
+    unavailable<PaginatedResponse<SavingsPlan>>("an admin personal-savings listing endpoint"),
+  getSavingsPlanById: (_id: string) =>
+    unavailable<SavingsPlan>("an admin personal-savings-by-id endpoint"),
 };
 
-// Thrift Service
 export const thriftService = {
-  async getThriftPlans(
-    page: number = 1,
-    limit: number = 10
-  ): Promise<ApiResponse<PaginatedResponse<ThriftPlan>>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(500);
-      const total = mockThriftPlans.length;
-      const start = (page - 1) * limit;
-      const data = mockThriftPlans.slice(start, start + limit);
-
-      return {
-        success: true,
-        data: {
-          data,
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-        },
-      };
-    }
-    const params = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-    });
-    return apiFetch(`/api/thrift?${params}`);
-  },
-
-  async getThriftPlanById(id: string): Promise<ApiResponse<ThriftPlan>> {
-    if (USE_MOCK_DATA) {
-      await simulateDelay(300);
-      const plan = mockThriftPlans.find(t => t.id === id);
-      if (plan) {
-        return { success: true, data: plan };
-      }
-      return { success: false, error: 'Thrift plan not found' };
-    }
-    return apiFetch(`/api/thrift/${id}`);
-  },
+  getThriftPlans: (_page?: number, _limit?: number) =>
+    unavailable<PaginatedResponse<ThriftPlan>>("an admin thrift-plan listing endpoint"),
+  getThriftPlanById: (_id: string) =>
+    unavailable<ThriftPlan>("an admin thrift-plan-by-id endpoint"),
 };
