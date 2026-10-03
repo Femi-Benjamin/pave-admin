@@ -1,5 +1,6 @@
 import type {
   AdminRole,
+  AdminUser,
   ActivityLog,
   AdminBlockUserResponse,
   AdminKycApprovalResponse,
@@ -346,13 +347,13 @@ export interface CreateAdminSavingsGroupInput {
 }
 
 export const authService = {
-  async login(email: string, password: string) {
+  async login(email: string, password: string): Promise<AdminUser> {
     const response = await apiFetch<Record<string, unknown>>(
-      "/api/v1/auth/login",
+      "/api/v1/admin/adminLogin",
       { method: "POST", body: JSON.stringify({ email, password }) },
     );
     if (!response.success || !response.data) {
-      return { success: false as const, error: response.error || "Login failed" };
+      throw new Error(response.error || response.message || "Login failed");
     }
 
     const payload = response.data;
@@ -364,40 +365,35 @@ export const authService = {
         : user.role === "admin"
           ? "admin"
           : undefined;
-    if (
-      typeof id !== "string" ||
-      typeof user.email !== "string" ||
-      (role !== "admin" && role !== "super_admin")
-    ) {
-      return {
-        success: false as const,
-        error: "The login response did not contain a valid admin account.",
-      };
-    }
-
     const token =
       typeof payload.token === "string"
         ? payload.token
         : typeof payload.accessToken === "string"
           ? payload.accessToken
           : undefined;
+    if (
+      typeof id !== "string" ||
+      typeof user.email !== "string" ||
+      !token ||
+      (role !== "admin" && role !== "super_admin")
+    ) {
+      throw new Error("The login response did not contain a valid admin account.");
+    }
+
     return {
-      success: true as const,
-      data: {
-        id,
-        name:
-          typeof user.name === "string"
-            ? user.name
+      id,
+      name:
+        typeof user.name === "string"
+          ? user.name
+          : typeof user.fullName === "string"
+            ? user.fullName
             : `${typeof user.firstName === "string" ? user.firstName : ""} ${
                 typeof user.lastName === "string" ? user.lastName : ""
               }`.trim(),
-        email: user.email,
-        role,
-        createdAt:
-          typeof user.createdAt === "string" ? user.createdAt : "",
-        ...(token ? { token } : {}),
-      },
-      message: response.message,
+      email: user.email,
+      role,
+      createdAt: typeof user.createdAt === "string" ? user.createdAt : "",
+      token,
     };
   },
   async forgotPassword(_email: string) {
