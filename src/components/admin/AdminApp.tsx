@@ -92,6 +92,11 @@ import {
   useAdminLeaderboard,
   useAdminTopPerformingUsers,
   useAdminSystemHealth,
+  useAdminNotifications,
+  useMarkAdminNotificationAsRead,
+  useMarkAllAdminNotificationsAsRead,
+  useDeleteAdminNotification,
+  useDeleteAllAdminNotifications,
 } from "@/hooks/useAdmin";
 import type {
   AdminDailyRegistration,
@@ -2328,6 +2333,198 @@ function ReportsSection() {
     {groups.isLoading ? <p className="mt-4 text-sm text-[#9CA3AF]">Loading savings group count...</p> : groups.isError ? <p role="alert" className="mt-4 text-sm text-red-600">Savings groups: {groups.error.message}<button onClick={() => void groups.refetch()} className="ml-2 font-semibold">Retry</button></p> : <p className="mt-4 text-sm text-[#6B7280] dark:text-[#94A3B8]">Savings groups: {groups.data?.length ?? 0} returned by the savings-groups API.</p>}
   </div>;
 }
+
+function NotificationsSection() {
+  const notifications = useAdminNotifications();
+  const markAsRead = useMarkAdminNotificationAsRead();
+  const markAllAsRead = useMarkAllAdminNotificationsAsRead();
+  const deleteNotification = useDeleteAdminNotification();
+  const deleteAll = useDeleteAllAdminNotifications();
+
+  const handleAction = async (
+    action: () => Promise<unknown>,
+    successMessage: string,
+  ) => {
+    try {
+      await action();
+      toast.success(successMessage);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Unable to update notifications",
+      );
+    }
+  };
+
+  const handleDeleteAll = () => {
+    if (
+      window.confirm(
+        "Delete all notifications? This action cannot be undone.",
+      )
+    ) {
+      void handleAction(
+        () => deleteAll.mutateAsync(),
+        "All notifications deleted",
+      );
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Notifications"
+        subtitle="Review and manage your notifications."
+        action={
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                void handleAction(
+                  () => markAllAsRead.mutateAsync(),
+                  "All notifications marked as read",
+                )
+              }
+              disabled={
+                !notifications.data?.unreadCount ||
+                markAllAsRead.isPending ||
+                notifications.isLoading
+              }
+              className="rounded-xl border border-[#E5E7EB] px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10"
+            >
+              <CheckCheck size={16} className="mr-2 inline" />
+              Mark all as read
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteAll}
+              disabled={
+                !notifications.data?.notifications.length ||
+                deleteAll.isPending ||
+                notifications.isLoading
+              }
+              className="rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Trash2 size={16} className="mr-2 inline" />
+              Delete all
+            </button>
+          </div>
+        }
+      />
+
+      {notifications.isLoading ? (
+        <div className="rounded-2xl border border-[#F1F3FB] bg-white p-8 text-center text-sm text-[#9CA3AF] shadow-sm dark:border-white/10 dark:bg-[#111327]">
+          Loading notifications...
+        </div>
+      ) : notifications.isError ? (
+        <div
+          role="alert"
+          className="rounded-2xl border border-red-200 bg-white p-8 text-center text-sm text-red-600 shadow-sm dark:bg-[#111327]"
+        >
+          <p>{notifications.error.message}</p>
+          <button
+            type="button"
+            onClick={() => void notifications.refetch()}
+            className="mt-3 font-semibold"
+          >
+            Retry
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <StatCard
+              label="Unread"
+              value={String(notifications.data.unreadCount)}
+              sub="Needs your attention"
+              icon={<Bell size={20} />}
+              color="#D97706"
+              bg="#FFFBEB"
+            />
+            <StatCard
+              label="Read"
+              value={String(notifications.data.readCount)}
+              sub="Previously viewed"
+              icon={<CheckCheck size={20} />}
+              color="#059669"
+              bg="#ECFDF5"
+            />
+          </div>
+          <div className="overflow-hidden rounded-2xl border border-[#F1F3FB] bg-white shadow-sm dark:border-white/10 dark:bg-[#111327]">
+            {notifications.data.notifications.length === 0 ? (
+              <div className="p-8 text-center text-sm text-[#9CA3AF]">
+                You have no notifications.
+              </div>
+            ) : (
+              <ul className="divide-y divide-[#F1F3FB] dark:divide-white/10">
+                {notifications.data.notifications.map((notification) => (
+                  <li
+                    key={notification.id}
+                    className={`flex items-start justify-between gap-4 p-5 ${
+                      notification.isRead ? "" : "bg-indigo-50/50 dark:bg-indigo-950/20"
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <div className="mb-1 flex items-center gap-2">
+                        <span className="text-sm font-semibold text-[#111827] dark:text-[#F0F2FF]">
+                          {notification.type.replaceAll("_", " ")}
+                        </span>
+                        {!notification.isRead && (
+                          <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200">
+                            Unread
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-[#4B5563] dark:text-[#CBD5E1]">
+                        {notification.message}
+                      </p>
+                      <p className="mt-2 text-xs text-[#9CA3AF]">
+                        {new Date(notification.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      {!notification.isRead && (
+                        <button
+                          type="button"
+                          aria-label="Mark notification as read"
+                          title="Mark as read"
+                          disabled={markAsRead.isPending}
+                          onClick={() =>
+                            void handleAction(
+                              () => markAsRead.mutateAsync(notification.id),
+                              "Notification marked as read",
+                            )
+                          }
+                          className="rounded-lg p-2 text-[#059669] hover:bg-emerald-50 disabled:opacity-50 dark:hover:bg-emerald-950/30"
+                        >
+                          <Check size={16} />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        aria-label="Delete notification"
+                        title="Delete notification"
+                        disabled={deleteNotification.isPending}
+                        onClick={() =>
+                          void handleAction(
+                            () => deleteNotification.mutateAsync(notification.id),
+                            "Notification deleted",
+                          )
+                        }
+                        className="rounded-lg p-2 text-red-600 hover:bg-red-50 disabled:opacity-50 dark:hover:bg-red-950/30"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function SettingsSection() {
   const { admin } = useAuth();
   const canManageAdmins = admin?.role === "super_admin";
@@ -2923,17 +3120,7 @@ export function AdminApp({
       case "settings":
         return <SettingsSection />;
       case "notifications":
-        return (
-          <div>
-            <PageHeader
-              title="Notifications"
-              subtitle="Notification features are not available in the documented API."
-            />
-            <div className="rounded-2xl border border-[#F1F3FB] bg-white p-8 text-center text-sm text-[#9CA3AF] shadow-sm dark:border-white/10 dark:bg-[#111327]">
-              The documented API collection has no admin notifications endpoint.
-            </div>
-          </div>
-        );
+        return <NotificationsSection />;
       default:
         return (
           <DashboardSection
@@ -3236,9 +3423,10 @@ export function AdminApp({
             </button>
 
             <button
-              disabled
-              title="Notifications are unavailable in the documented API"
-              className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-xl bg-[#F1F3FB] opacity-50 dark:bg-white/5"
+              onClick={() => nav("notifications")}
+              title="View notifications"
+              aria-label="View notifications"
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F1F3FB] transition-colors hover:bg-[#EEF2FF] dark:bg-white/5 dark:hover:bg-white/10"
             >
               <Bell size={17} className="text-[#374151] dark:text-[#F0F2FF]" />
             </button>

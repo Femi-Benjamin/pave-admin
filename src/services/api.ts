@@ -90,7 +90,7 @@ async function requestApi(
         error: responseMessage(body, `Request failed (${response.status})`),
       };
     }
-    if (isRecord(body) && body.success === false) {
+    if (isRecord(body) && (body.success === false || body.status === false)) {
       return { success: false, error: responseMessage(body, "Request failed") };
     }
 
@@ -324,6 +324,22 @@ export interface AdminSystemHealth {
   system: Record<string, unknown>;
   revenue: Record<string, unknown>;
   performance: Record<string, unknown>;
+}
+
+export interface AdminNotification {
+  id: string;
+  userId: string;
+  type: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminNotifications {
+  notifications: AdminNotification[];
+  unreadCount: number;
+  readCount: number;
 }
 
 export interface AdminSavingsGroup {
@@ -961,6 +977,104 @@ export const adminService = {
       method: "POST",
       body: JSON.stringify(input),
     });
+  },
+};
+
+export const notificationService = {
+  async getAll(): Promise<ApiResponse<AdminNotifications>> {
+    const response = await apiFetch<unknown>(
+      "/api/v1/notifications/getUserNotifications",
+    );
+    if (!response.success) return failedResponse<AdminNotifications>(response);
+    if (!isRecord(response.data) || !Array.isArray(response.data.notifications)) {
+      return {
+        success: false,
+        error: "The notifications response did not match the documented shape.",
+      };
+    }
+
+    const notifications = response.data.notifications.map(
+      (notification): AdminNotification | undefined => {
+        if (
+          !isRecord(notification) ||
+          typeof notification._id !== "string" ||
+          typeof notification.userId !== "string" ||
+          typeof notification.type !== "string" ||
+          typeof notification.message !== "string" ||
+          typeof notification.isRead !== "boolean" ||
+          typeof notification.createdAt !== "string" ||
+          typeof notification.updatedAt !== "string"
+        ) {
+          return undefined;
+        }
+        return {
+          id: notification._id,
+          userId: notification.userId,
+          type: notification.type,
+          message: notification.message,
+          isRead: notification.isRead,
+          createdAt: notification.createdAt,
+          updatedAt: notification.updatedAt,
+        };
+      },
+    );
+    if (
+      notifications.some((notification) => !notification) ||
+      typeof response.data.unReadcount !== "number" ||
+      typeof response.data.readcount !== "number"
+    ) {
+      return {
+        success: false,
+        error: "The notifications response did not match the documented shape.",
+      };
+    }
+
+    return {
+      ...response,
+      data: {
+        notifications: notifications.filter(
+          (notification): notification is AdminNotification =>
+            notification !== undefined,
+        ),
+        unreadCount: response.data.unReadcount,
+        readCount: response.data.readcount,
+      },
+    };
+  },
+  async markAsRead(id: string): Promise<ApiResponse<void>> {
+    const response = await requestApi(
+      `/api/v1/notifications/mark-as-read/${encodeURIComponent(id)}`,
+      { method: "PATCH" },
+    );
+    return response.success
+      ? { success: true, message: response.message }
+      : failedResponse<void>(response);
+  },
+  async markAllAsRead(): Promise<ApiResponse<void>> {
+    const response = await requestApi(
+      "/api/v1/notifications/mark-all-as-read",
+      { method: "PATCH" },
+    );
+    return response.success
+      ? { success: true, message: response.message }
+      : failedResponse<void>(response);
+  },
+  async deleteById(id: string): Promise<ApiResponse<void>> {
+    const response = await requestApi(
+      `/api/v1/notifications/delete/${encodeURIComponent(id)}`,
+      { method: "DELETE" },
+    );
+    return response.success
+      ? { success: true, message: response.message }
+      : failedResponse<void>(response);
+  },
+  async deleteAll(): Promise<ApiResponse<void>> {
+    const response = await requestApi("/api/v1/notifications/delete-all", {
+      method: "DELETE",
+    });
+    return response.success
+      ? { success: true, message: response.message }
+      : failedResponse<void>(response);
   },
 };
 

@@ -229,7 +229,7 @@ export default function Login() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder=" chinedu@pave.ng"
+                  placeholder="arowolo@yopmail"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   className="h-12"
@@ -243,7 +243,7 @@ export default function Login() {
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="admin123"
+                    placeholder="admin198177"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     className="h-12 pr-12"
@@ -285,12 +285,6 @@ export default function Login() {
                   "Sign in"
                 )}
               </Button>
-              {/* <p className="text-center text-sm text-muted-foreground">
-                Demo credentials:{" "}
-                <span className="text-foreground">
-                  chinedu@pave.ng / admin123
-                </span>
-              </p> */}
               <p className="text-center text-md text-muted-foreground">
                 Need an admin account?{" "}
                 <button

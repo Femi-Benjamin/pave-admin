@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { adminService } from "@/services/api";
+import { adminService, notificationService } from "@/services/api";
 import type {
   CreateAdminAccountInput,
 } from "@/types";
@@ -8,6 +8,91 @@ import type {
 } from "@/services/api";
 
 const pendingKycQueryKey = ["admin", "pending-kyc"] as const;
+const notificationsQueryKey = ["admin", "notifications"] as const;
+
+export function useAdminNotifications(enabled = true) {
+  return useQuery({
+    queryKey: notificationsQueryKey,
+    enabled,
+    queryFn: async () => {
+      const response = await notificationService.getAll();
+      if (!response.success || !response.data) {
+        throw new Error(
+          response.error || response.message || "Unable to load notifications",
+        );
+      }
+      return response.data;
+    },
+  });
+}
+
+export function useMarkAdminNotificationAsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (notificationId: string) => {
+      const response = await notificationService.markAsRead(notificationId);
+      if (!response.success) {
+        throw new Error(
+          response.error || response.message || "Unable to mark notification as read",
+        );
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: notificationsQueryKey });
+    },
+  });
+}
+
+export function useMarkAllAdminNotificationsAsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await notificationService.markAllAsRead();
+      if (!response.success) {
+        throw new Error(
+          response.error || response.message || "Unable to mark all notifications as read",
+        );
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: notificationsQueryKey });
+    },
+  });
+}
+
+export function useDeleteAdminNotification() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (notificationId: string) => {
+      const response = await notificationService.deleteById(notificationId);
+      if (!response.success) {
+        throw new Error(
+          response.error || response.message || "Unable to delete notification",
+        );
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: notificationsQueryKey });
+    },
+  });
+}
+
+export function useDeleteAllAdminNotifications() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await notificationService.deleteAll();
+      if (!response.success) {
+        throw new Error(
+          response.error || response.message || "Unable to delete notifications",
+        );
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: notificationsQueryKey });
+    },
+  });
+}
 
 export function usePendingAdminKyc(enabled = true) {
   return useQuery({
