@@ -79,7 +79,10 @@ import {
   useAdminSavingsGroups,
   usePendingAdminKyc,
   useAdminDashboardTotals,
+  useAdminTotalSavings,
   useAdminTotalMembers,
+  useAdminRevenueOverview,
+  useAdminMemberGrowthByMonth,
   useAdminUserStatistics,
   useAdminDailyRegistrations,
   useAdminRetentionStatistics,
@@ -87,6 +90,7 @@ import {
   useAdminVendingGraph,
   useAdminYearlyVending,
   useAdminLeaderboard,
+  useAdminTopPerformingUsers,
   useAdminSystemHealth,
 } from "@/hooks/useAdmin";
 import type {
@@ -385,14 +389,15 @@ function DashboardSection({
   onInvite: () => void;
 }) {
   const totalsQuery = useAdminDashboardTotals();
+  const savingsQuery = useAdminTotalSavings();
   const membersQuery = useAdminTotalMembers();
   const members = membersQuery.data;
-  const registrationsQuery = useAdminDailyRegistrations();
+  const revenueQuery = useAdminRevenueOverview();
+  const memberGrowthQuery = useAdminMemberGrowthByMonth();
   const pendingKycQuery = usePendingAdminKyc();
-  const vendingQuery = useAdminVendingGraph();
   const transactionsQuery = useAdminTransactions();
-  const vendingData = vendingQuery.data?.monthly ?? [];
-  const registrations = registrationsQuery.data ?? [];
+  const revenueData = revenueQuery.data ?? [];
+  const memberGrowth = memberGrowthQuery.data ?? [];
   const recentTransactions = [...(transactionsQuery.data?.data ?? [])]
     .sort(
       (left, right) =>
@@ -438,8 +443,8 @@ function DashboardSection({
         />
         <StatCard
           label="Total Savings"
-          value={totalsQuery.isLoading ? "..." : totalsQuery.data?.totalSavings === undefined ? "Unavailable" : fmt(totalsQuery.data.totalSavings)}
-          sub={totalsQuery.data?.totalSavings === undefined ? "Not returned by the documented totals response" : "Backend total"}
+          value={savingsQuery.isLoading ? "..." : savingsQuery.data === undefined ? "Unavailable" : fmt(savingsQuery.data)}
+          sub="Backend total"
           icon={<PiggyBank size={20} />}
           color="#D97706"
           bg="#FFFBEB"
@@ -457,6 +462,12 @@ function DashboardSection({
         <QueryErrorNotice
           error={totalsQuery.error}
           onRetry={() => void totalsQuery.refetch()}
+        />
+      )}
+      {savingsQuery.isError && (
+        <QueryErrorNotice
+          error={savingsQuery.error}
+          onRetry={() => void savingsQuery.refetch()}
         />
       )}
       {membersQuery.isError && (
@@ -483,34 +494,36 @@ function DashboardSection({
               }}
               className="text-[#0D0F1C] dark:text-[#F0F2FF]"
             >
-              Vending Activity
+              Revenue Overview
             </h3>
             <Badge color="indigo">Monthly</Badge>
           </div>
-          {vendingQuery.isLoading ? (
-            <div className="flex h-[220px] items-center justify-center text-sm text-[#9CA3AF]">Loading vending activity...</div>
-          ) : vendingQuery.isError ? (
+            {revenueQuery.isLoading ? (
+              <div className="flex h-[220px] items-center justify-center text-sm text-[#9CA3AF]">Loading revenue overview...</div>
+            ) : revenueQuery.isError ? (
             <div className="flex h-[220px] flex-col items-center justify-center gap-3 text-sm text-red-600">
-              <span>{vendingQuery.error.message}</span>
-              <button onClick={() => void vendingQuery.refetch()} className="font-semibold text-[#3730A3]">Retry</button>
+                <span>{revenueQuery.error.message}</span>
+                <button onClick={() => void revenueQuery.refetch()} className="font-semibold text-[#3730A3]">Retry</button>
             </div>
-          ) : vendingData.length === 0 ? (
-            <div className="flex h-[220px] items-center justify-center text-sm text-[#9CA3AF]">No monthly vending data found.</div>
+            ) : revenueData.length === 0 ? (
+              <div className="flex h-[220px] items-center justify-center text-sm text-[#9CA3AF]">No revenue overview data found.</div>
           ) : (
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={vendingData}>
+              <AreaChart data={revenueData}>
               <defs>
-                <linearGradient id="walletGrad" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#3730A3" stopOpacity={0.25} />
                   <stop offset="95%" stopColor="#3730A3" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="savingsGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#059669" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="#059669" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis
                 dataKey="month"
+                tickFormatter={(value: string) => {
+                  const date = new Date(value);
+                  return Number.isNaN(date.getTime())
+                    ? value
+                    : date.toLocaleDateString(undefined, { month: "short", year: "2-digit" });
+                }}
                 tick={{ fontSize: 11, fill: "#9CA3AF" }}
                 axisLine={false}
                 tickLine={false}
@@ -540,11 +553,11 @@ function DashboardSection({
               />
               <Area
                 type="monotone"
-                dataKey="totalAmount"
+                dataKey="revenue"
                 stroke="#3730A3"
                 strokeWidth={2.5}
-                fill="url(#walletGrad)"
-                name="Vending amount"
+                fill="url(#revenueGrad)"
+                name="Revenue"
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -593,20 +606,20 @@ function DashboardSection({
           >
             Member Growth
           </h3>
-          {registrationsQuery.isLoading ? (
-            <div className="flex h-[160px] items-center justify-center text-sm text-[#9CA3AF]">Loading daily registrations...</div>
-          ) : registrationsQuery.isError ? (
+          {memberGrowthQuery.isLoading ? (
+            <div className="flex h-[160px] items-center justify-center text-sm text-[#9CA3AF]">Loading member growth...</div>
+          ) : memberGrowthQuery.isError ? (
             <div className="flex h-[160px] flex-col items-center justify-center gap-3 text-sm text-red-600">
-              <span>{registrationsQuery.error.message}</span>
-              <button onClick={() => void registrationsQuery.refetch()} className="font-semibold text-[#3730A3]">Retry</button>
+              <span>{memberGrowthQuery.error.message}</span>
+              <button onClick={() => void memberGrowthQuery.refetch()} className="font-semibold text-[#3730A3]">Retry</button>
             </div>
-          ) : registrations.length === 0 ? (
-            <div className="flex h-[160px] items-center justify-center text-sm text-[#9CA3AF]">No daily registrations found.</div>
+          ) : memberGrowth.length === 0 ? (
+            <div className="flex h-[160px] items-center justify-center text-sm text-[#9CA3AF]">No monthly member growth data found.</div>
           ) : (
           <ResponsiveContainer width="100%" height={160}>
-            <BarChart data={registrations}>
+            <BarChart data={memberGrowth}>
               <XAxis
-                dataKey="date"
+                dataKey="month"
                 tick={{ fontSize: 11, fill: "#9CA3AF" }}
                 axisLine={false}
                 tickLine={false}
@@ -624,10 +637,10 @@ function DashboardSection({
                 }}
               />
               <Bar
-                dataKey="registrations"
+                dataKey="members"
                 fill="#3730A3"
                 radius={[6, 6, 0, 0]}
-                name="Registrations"
+                name="Members"
               />
             </BarChart>
           </ResponsiveContainer>
@@ -2239,6 +2252,7 @@ function ReportsSection() {
   const registrations = useAdminDailyRegistrations();
   const cohorts = useAdminCohortAnalysis();
   const leaderboard = useAdminLeaderboard();
+  const topContributors = useAdminTopPerformingUsers();
   const health = useAdminSystemHealth();
   const groups = useAdminSavingsGroups();
   const monthly = vending.data?.monthly ?? [];
@@ -2248,11 +2262,12 @@ function ReportsSection() {
 
   return <div>
     <PageHeader title="Reports & Analytics" subtitle="Insights from documented platform analytics" action={<button disabled title="A report export endpoint is not available in the documented API" className="px-4 py-2 bg-[#059669] text-white rounded-xl text-sm font-semibold opacity-50 cursor-not-allowed"><Download size={16} /> Export unavailable</button>} />
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
       <StatCard label="Total Members" value={memberCount.isLoading ? "..." : memberCount.data === undefined ? "Unavailable" : memberCount.data.toLocaleString()} sub="Admin member count" icon={<Users size={20} />} />
       <StatCard label="Active Users (24h)" value={userStats.isLoading ? "..." : userStats.data?.activeUsersLast24Hours.toLocaleString() ?? "Unavailable"} sub="Admin user statistics" icon={<Users size={20} />} color="#059669" bg="#ECFDF5" />
+      <StatCard label="Registrations (month)" value={userStats.isLoading ? "..." : userStats.data?.registrations.thisMonth.toLocaleString() ?? "Unavailable"} sub="From user statistics" icon={<UserPlus size={20} />} color="#2563EB" bg="#EFF6FF" />
       <StatCard label="Yearly Vending Amount" value={yearly.isLoading ? "..." : yearly.data ? fmt(yearly.data.summary.totalAmount) : "Unavailable"} sub={yearly.data ? `${yearly.data.summary.count} transactions` : "Vending summary"} icon={<DollarSign size={20} />} color="#D97706" bg="#FFFBEB" />
-      <StatCard label="Retention Rate" value={retention.isLoading ? "..." : retention.data ? `${retention.data.retentionRate}%` : "Unavailable"} sub="Admin retention statistics" icon={<TrendingUp size={20} />} color="#7C3AED" bg="#F5F3FF" />
+      <StatCard label="Retention Rate" value={retention.isLoading ? "..." : retention.data?.retentionRate ?? "Unavailable"} sub="Admin retention statistics" icon={<TrendingUp size={20} />} color="#7C3AED" bg="#F5F3FF" />
     </div>
     {memberCount.isError && <QueryErrorNotice error={memberCount.error} onRetry={() => void memberCount.refetch()} />}
     {userStats.isError && <QueryErrorNotice error={userStats.error} onRetry={() => void userStats.refetch()} />}
@@ -2266,6 +2281,49 @@ function ReportsSection() {
       <section className="rounded-2xl border border-[#F1F3FB] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111327]"><h3 className="mb-4 font-bold">Cohort Analysis</h3>{cohorts.isLoading ? <p className="text-sm text-[#9CA3AF]">Loading cohorts...</p> : cohorts.isError ? <div role="alert" className="text-sm text-red-600">{cohorts.error.message}<button onClick={() => void cohorts.refetch()} className="ml-2 font-semibold">Retry</button></div> : !cohorts.data?.length ? <p className="text-sm text-[#9CA3AF]">No cohort data found.</p> : <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="text-xs uppercase text-[#9CA3AF]"><tr><th className="py-2">Cohort</th><th className="py-2">Registered</th><th className="py-2">Active</th></tr></thead><tbody>{cohorts.data.map((row) => <tr key={row.cohort}><td className="py-2">{row.cohort}</td><td className="py-2">{row.totalRegistered}</td><td className="py-2">{row.activeUsersInCohort}</td></tr>)}</tbody></table></div>}</section>
       <section className="rounded-2xl border border-[#F1F3FB] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111327]"><h3 className="mb-4 font-bold">Top Users by Vending Amount</h3>{leaderboard.isLoading ? <p className="text-sm text-[#9CA3AF]">Loading leaderboard...</p> : leaderboard.isError ? <div role="alert" className="text-sm text-red-600">{leaderboard.error.message}<button onClick={() => void leaderboard.refetch()} className="ml-2 font-semibold">Retry</button></div> : !topUsers.length ? <p className="text-sm text-[#9CA3AF]">No leaderboard users found.</p> : topUsers.map((row) => <div key={row.userId} className="flex justify-between gap-3 border-b border-[#F1F3FB] py-2 text-sm dark:border-white/10"><div><div className="font-semibold">{row.fullName}</div><div className="text-xs text-[#9CA3AF]">{row.email}</div></div><div className="text-right"><div>{fmt(row.totalAmount)}</div><div className="text-xs text-[#9CA3AF]">{row.transactionCount} transactions</div></div></div>)}</section>
     </div>
+    <section className="mt-4 rounded-2xl border border-[#F1F3FB] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111327]">
+      <h3 className="mb-4 font-bold">Top Performing Users in Contribution</h3>
+      {topContributors.isLoading ? (
+        <p className="text-sm text-[#9CA3AF]">Loading top contributors...</p>
+      ) : topContributors.isError ? (
+        <div role="alert" className="text-sm text-red-600">
+          {topContributors.error.message}
+          <button
+            onClick={() => void topContributors.refetch()}
+            className="ml-2 font-semibold"
+          >
+            Retry
+          </button>
+        </div>
+      ) : !topContributors.data?.length ? (
+        <p className="text-sm text-[#9CA3AF]">No top contributors found.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="text-xs uppercase text-[#9CA3AF]">
+              <tr>
+                <th className="py-2">Member</th>
+                <th className="py-2">Email</th>
+                <th className="py-2">Contribution</th>
+                <th className="py-2">Units</th>
+                <th className="py-2">Transactions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topContributors.data.map((row) => (
+                <tr key={row.userId}>
+                  <td className="py-2 font-medium">{row.fullName}</td>
+                  <td className="py-2">{row.email}</td>
+                  <td className="py-2">{fmt(row.totalAmount)}</td>
+                  <td className="py-2">{row.totalUnits.toLocaleString()}</td>
+                  <td className="py-2">{row.transactionCount.toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
     <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">{(["system", "revenue", "performance"] as const).map((category) => { const values = health.data?.[category]; return <section key={category} className="rounded-2xl border border-[#F1F3FB] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111327]"><h3 className="mb-3 font-bold capitalize">{category} Health</h3>{health.isLoading ? <p className="text-sm text-[#9CA3AF]">Loading...</p> : health.isError ? <div role="alert" className="text-sm text-red-600">{health.error.message}<button onClick={() => void health.refetch()} className="ml-2 font-semibold">Retry</button></div> : values && healthFields(values).length ? healthFields(values).map(([key, value]) => <div key={key} className="flex justify-between border-b border-[#F1F3FB] py-1.5 text-xs dark:border-white/10"><span className="text-[#9CA3AF]">{key}</span><span>{String(value)}</span></div>) : <p className="text-sm text-[#9CA3AF]">No summary fields provided.</p>}</section>; })}</div>
     {groups.isLoading ? <p className="mt-4 text-sm text-[#9CA3AF]">Loading savings group count...</p> : groups.isError ? <p role="alert" className="mt-4 text-sm text-red-600">Savings groups: {groups.error.message}<button onClick={() => void groups.refetch()} className="ml-2 font-semibold">Retry</button></p> : <p className="mt-4 text-sm text-[#6B7280] dark:text-[#94A3B8]">Savings groups: {groups.data?.length ?? 0} returned by the savings-groups API.</p>}
   </div>;

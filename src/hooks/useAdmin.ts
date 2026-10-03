@@ -221,6 +221,20 @@ export function useAdminDashboardTotals(enabled = true) {
   });
 }
 
+export function useAdminTotalSavings(enabled = true) {
+  return useQuery({
+    queryKey: ["admin", "total-savings"],
+    enabled,
+    queryFn: async () => {
+      const response = await adminService.getTotalSavings();
+      if (!response.success || response.data === undefined) {
+        throw new Error(response.error || response.message || "Unable to load total savings");
+      }
+      return response.data;
+    },
+  });
+}
+
 export function useAdminTotalMembers(enabled = true) {
   return useQuery({
     queryKey: ["admin", "total-members"],
@@ -229,6 +243,34 @@ export function useAdminTotalMembers(enabled = true) {
       const response = await adminService.getTotalMembers();
       if (!response.success || response.data === undefined) {
         throw new Error(response.error || response.message || "Unable to load total members");
+      }
+      return response.data;
+    },
+  });
+}
+
+export function useAdminRevenueOverview(enabled = true) {
+  return useQuery({
+    queryKey: ["admin", "revenue-overview"],
+    enabled,
+    queryFn: async () => {
+      const response = await adminService.getRevenueOverview();
+      if (!response.success || !response.data) {
+        throw new Error(response.error || response.message || "Unable to load revenue overview");
+      }
+      return response.data;
+    },
+  });
+}
+
+export function useAdminMemberGrowthByMonth(enabled = true) {
+  return useQuery({
+    queryKey: ["admin", "member-growth-by-month"],
+    enabled,
+    queryFn: async () => {
+      const response = await adminService.getMemberGrowthByMonth();
+      if (!response.success || !response.data) {
+        throw new Error(response.error || response.message || "Unable to load monthly member growth");
       }
       return response.data;
     },
@@ -327,6 +369,24 @@ export function useAdminLeaderboard(enabled = true) {
       const response = await adminService.getLeaderboard();
       if (!response.success || !response.data) {
         throw new Error(response.error || response.message || "Unable to load user leaderboard");
+      }
+      return response.data;
+    },
+  });
+}
+
+export function useAdminTopPerformingUsers(enabled = true) {
+  return useQuery({
+    queryKey: ["admin", "top-performing-contributors"],
+    enabled,
+    queryFn: async () => {
+      const response = await adminService.getTopPerformingUsers();
+      if (!response.success || !response.data) {
+        throw new Error(
+          response.error ||
+            response.message ||
+            "Unable to load top-performing contributors",
+        );
       }
       return response.data;
     },

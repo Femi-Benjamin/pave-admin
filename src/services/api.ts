@@ -238,14 +238,28 @@ function mapAdminTransaction(value: unknown): AdminTransaction | undefined {
 }
 
 export interface AdminDashboardTotals {
-  totalWalletBalance?: number;
-  totalSavings?: number;
+  totalWalletBalance: number;
+}
+
+export interface AdminRevenuePoint {
+  month: string;
+  revenue: number;
+}
+
+export interface AdminMemberGrowthPoint {
+  month: string;
+  members: number;
 }
 
 export interface AdminUserStatistics {
   totalUsers: number;
   activeUsersLast24Hours: number;
-  registrations: number;
+  registrations: {
+    today: number;
+    thisWeek: number;
+    thisMonth: number;
+    thisYear: number;
+  };
 }
 
 export interface AdminDailyRegistration {
@@ -257,7 +271,7 @@ export interface AdminDailyRegistration {
 export interface AdminRetentionStatistics {
   dailyActiveUsers: number;
   monthlyActiveUsers: number;
-  retentionRate: number;
+  retentionRate: string;
 }
 
 export interface AdminCohort {
@@ -490,17 +504,33 @@ export const adminService = {
       "/api/v1/admin/getAllTotalWalletBalance",
     );
     if (!response.success) return failedResponse<AdminDashboardTotals>(response);
-    if (!response.data) {
-      return { success: false, error: "The dashboard totals response was malformed." };
+    if (
+      !response.data ||
+      typeof response.data.totalWalletBalance !== "number"
+    ) {
+      return {
+        success: false,
+        error:
+          "The wallet-balance response did not include a numeric totalWalletBalance value.",
+      };
     }
-    const totals: AdminDashboardTotals = {};
-    if (typeof response.data.totalWalletBalance === "number") {
-      totals.totalWalletBalance = response.data.totalWalletBalance;
+    return {
+      ...response,
+      data: { totalWalletBalance: response.data.totalWalletBalance },
+    };
+  },
+  async getTotalSavings(): Promise<ApiResponse<number>> {
+    const response = await apiFetch<Record<string, unknown>>(
+      "/api/v1/admin/getTotalSavings",
+    );
+    if (!response.success) return failedResponse<number>(response);
+    if (!response.data || typeof response.data.totalSavings !== "number") {
+      return {
+        success: false,
+        error: "The total-savings response did not include a numeric totalSavings value.",
+      };
     }
-    if (typeof response.data.totalSavings === "number") {
-      totals.totalSavings = response.data.totalSavings;
-    }
-    return { ...response, data: totals };
+    return { ...response, data: response.data.totalSavings };
   },
   async getTotalMembers(): Promise<ApiResponse<number>> {
     const response = await apiFetch<unknown>(
@@ -515,6 +545,79 @@ export const adminService = {
     }
     return { ...response, data: response.data.count };
   },
+  async getRevenueOverview(): Promise<ApiResponse<AdminRevenuePoint[]>> {
+    const response = await apiFetch<unknown>("/api/v1/admin/revenueOverview");
+    if (!response.success) return failedResponse<AdminRevenuePoint[]>(response);
+    if (!Array.isArray(response.data)) {
+      return {
+        success: false,
+        error: "The revenue-overview response did not contain an array.",
+      };
+    }
+    const points = response.data.map((point): AdminRevenuePoint | undefined => {
+      if (
+        !isRecord(point) ||
+        typeof point.month !== "string" ||
+        typeof point.revenue !== "number"
+      ) {
+        return undefined;
+      }
+      return { month: point.month, revenue: point.revenue };
+    });
+    if (points.some((point) => !point)) {
+      return {
+        success: false,
+        error: "The revenue-overview response did not match the documented shape.",
+      };
+    }
+    return { ...response, data: points as AdminRevenuePoint[] };
+  },
+  async getMemberGrowthByMonth(): Promise<ApiResponse<AdminMemberGrowthPoint[]>> {
+    const response = await apiFetch<unknown>(
+      "/api/v1/admin/getMemberGrowthByMonth",
+    );
+    if (!response.success) {
+      return failedResponse<AdminMemberGrowthPoint[]>(response);
+    }
+    if (!Array.isArray(response.data)) {
+      return {
+        success: false,
+        error: "The monthly member-growth response was not an array.",
+      };
+    }
+    const points = response.data.map(
+      (point): AdminMemberGrowthPoint | undefined => {
+        if (!isRecord(point)) return undefined;
+        const month =
+          typeof point.month === "string"
+            ? point.month
+            : typeof point.date === "string"
+              ? point.date
+              : undefined;
+        const members =
+          typeof point.members === "number"
+            ? point.members
+            : typeof point.count === "number"
+              ? point.count
+              : typeof point.totalMembers === "number"
+                ? point.totalMembers
+                : typeof point.memberCount === "number"
+                  ? point.memberCount
+                  : undefined;
+        return month !== undefined && members !== undefined
+          ? { month, members }
+          : undefined;
+      },
+    );
+    if (points.some((point) => !point)) {
+      return {
+        success: false,
+        error:
+          "The monthly member-growth response did not include month and members/count values.",
+      };
+    }
+    return { ...response, data: points as AdminMemberGrowthPoint[] };
+  },
   async getUserStatistics(): Promise<ApiResponse<AdminUserStatistics>> {
     const response = await apiFetchRaw<unknown>("/api/v1/admin/user/stats");
     if (!response.success || !isRecord(response.data) || !isRecord(response.data.stats)) {
@@ -526,7 +629,11 @@ export const adminService = {
     if (
       typeof stats.totalUsers !== "number" ||
       typeof stats.activeUsersLast24Hours !== "number" ||
-      typeof stats.registrations !== "number"
+      !isRecord(stats.registrations) ||
+      typeof stats.registrations.today !== "number" ||
+      typeof stats.registrations.thisWeek !== "number" ||
+      typeof stats.registrations.thisMonth !== "number" ||
+      typeof stats.registrations.thisYear !== "number"
     ) {
       return {
         success: false,
@@ -538,12 +645,55 @@ export const adminService = {
       data: {
         totalUsers: stats.totalUsers,
         activeUsersLast24Hours: stats.activeUsersLast24Hours,
-        registrations: stats.registrations,
+        registrations: {
+          today: stats.registrations.today,
+          thisWeek: stats.registrations.thisWeek,
+          thisMonth: stats.registrations.thisMonth,
+          thisYear: stats.registrations.thisYear,
+        },
       },
     };
   },
-  getDailyRegistrations() {
-    return apiFetch<AdminDailyRegistration[]>("/api/v1/admin/user/daily");
+  async getDailyRegistrations(): Promise<ApiResponse<AdminDailyRegistration[]>> {
+    const response = await apiFetch<unknown>("/api/v1/admin/user/daily");
+    if (!response.success) return failedResponse<AdminDailyRegistration[]>(response);
+    if (!Array.isArray(response.data)) {
+      return {
+        success: false,
+        error: "The daily-registrations response did not contain an array.",
+      };
+    }
+    const registrations = response.data.map(
+      (row): AdminDailyRegistration | undefined => {
+        if (
+          !isRecord(row) ||
+          typeof row.date !== "string" ||
+          typeof row.registrations !== "number" ||
+          (row.names !== undefined &&
+            (!Array.isArray(row.names) ||
+              row.names.some((name) => typeof name !== "string")))
+        ) {
+          return undefined;
+        }
+        return {
+          date: row.date,
+          registrations: row.registrations,
+          ...(Array.isArray(row.names) ? { names: row.names as string[] } : {}),
+        };
+      },
+    );
+    if (registrations.some((row) => !row)) {
+      return {
+        success: false,
+        error: "The daily-registrations response did not match the documented shape.",
+      };
+    }
+    return {
+      ...response,
+      data: registrations.filter(
+        (row): row is AdminDailyRegistration => row !== undefined,
+      ),
+    };
   },
   async getRetentionStatistics(): Promise<ApiResponse<AdminRetentionStatistics>> {
     const response = await apiFetchRaw<unknown>("/api/v1/admin/getRetentionStats");
@@ -555,7 +705,8 @@ export const adminService = {
     if (
       typeof dailyActiveUsers !== "number" ||
       typeof monthlyActiveUsers !== "number" ||
-      typeof retentionRate !== "number"
+      typeof retentionRate !== "string" ||
+      !/^\d+(?:\.\d+)?%$/.test(retentionRate)
     ) {
       return {
         success: false,
@@ -567,8 +718,40 @@ export const adminService = {
       data: { dailyActiveUsers, monthlyActiveUsers, retentionRate },
     };
   },
-  getCohortAnalysis() {
-    return apiFetch<AdminCohort[]>("/api/v1/admin/getCohortAnalysis");
+  async getCohortAnalysis(): Promise<ApiResponse<AdminCohort[]>> {
+    const response = await apiFetch<unknown>("/api/v1/admin/getCohortAnalysis");
+    if (!response.success) return failedResponse<AdminCohort[]>(response);
+    if (!Array.isArray(response.data)) {
+      return {
+        success: false,
+        error: "The cohort-analysis response did not contain an array.",
+      };
+    }
+    const cohorts = response.data.map((row): AdminCohort | undefined => {
+      if (
+        !isRecord(row) ||
+        typeof row.cohort !== "string" ||
+        typeof row.totalRegistered !== "number" ||
+        typeof row.activeUsersInCohort !== "number"
+      ) {
+        return undefined;
+      }
+      return {
+        cohort: row.cohort,
+        totalRegistered: row.totalRegistered,
+        activeUsersInCohort: row.activeUsersInCohort,
+      };
+    });
+    if (cohorts.some((row) => !row)) {
+      return {
+        success: false,
+        error: "The cohort-analysis response did not match the documented shape.",
+      };
+    }
+    return {
+      ...response,
+      data: cohorts.filter((row): row is AdminCohort => row !== undefined),
+    };
   },
   async getVendingGraph(): Promise<ApiResponse<AdminVendingGraph>> {
     const response = await apiFetchRaw<unknown>("/api/v1/admin/vending/graph");
@@ -692,8 +875,83 @@ export const adminService = {
       data: { leaderboards: parsed },
     };
   },
-  getSystemHealthSummary() {
-    return apiFetch<AdminSystemHealth>("/api/v1/admin/getSystemHealthSummary");
+  async getTopPerformingUsers(): Promise<
+    ApiResponse<AdminLeaderboardEntry[]>
+  > {
+    const response = await apiFetch<unknown>(
+      "/api/v1/admin/getTopPerformingUsers",
+    );
+    if (!response.success) {
+      return failedResponse<AdminLeaderboardEntry[]>(response);
+    }
+    if (!Array.isArray(response.data)) {
+      return {
+        success: false,
+        error: "The top-performing-users response did not contain an array.",
+      };
+    }
+    const entries = response.data.map(
+      (row): AdminLeaderboardEntry | undefined => {
+        if (
+          !isRecord(row) ||
+          typeof row.totalAmount !== "number" ||
+          typeof row.totalUnits !== "number" ||
+          typeof row.transactionCount !== "number" ||
+          typeof row.userId !== "string" ||
+          typeof row.fullName !== "string" ||
+          typeof row.email !== "string"
+        ) {
+          return undefined;
+        }
+        return {
+          totalAmount: row.totalAmount,
+          totalUnits: row.totalUnits,
+          transactionCount: row.transactionCount,
+          userId: row.userId,
+          fullName: row.fullName,
+          email: row.email,
+        };
+      },
+    );
+    if (entries.some((entry) => !entry)) {
+      return {
+        success: false,
+        error: "The top-performing-users response did not match the documented shape.",
+      };
+    }
+    return {
+      ...response,
+      data: entries.filter(
+        (entry): entry is AdminLeaderboardEntry => entry !== undefined,
+      ),
+    };
+  },
+  async getSystemHealthSummary(): Promise<ApiResponse<AdminSystemHealth>> {
+    const response = await apiFetch<unknown>(
+      "/api/v1/admin/getSystemHealthSummary",
+    );
+    if (!response.success) {
+      return failedResponse<AdminSystemHealth>(response);
+    }
+    if (
+      !isRecord(response.data) ||
+      !isRecord(response.data.system) ||
+      !isRecord(response.data.revenue) ||
+      !isRecord(response.data.performance)
+    ) {
+      return {
+        success: false,
+        error: "The system-health response did not match the documented shape.",
+      };
+    }
+    return {
+      ...response,
+      data: {
+        system: response.data.system,
+        revenue: response.data.revenue,
+        performance: response.data.performance,
+      },
+    };
   },
   getSavingsGroups() {
     return apiFetch<AdminSavingsGroup[]>("/api/v1/group-saving/get-all-groups");
