@@ -1870,14 +1870,13 @@ function AdminTransactionsSection() {
   const [meterNumberInput, setMeterNumberInput] = useState("");
   const [searchedMeterNumber, setSearchedMeterNumber] = useState("");
   const [selectedUserId, setSelectedUserId] = useState("all");
-  const [selectedTransactionId, setSelectedTransactionId] = useState<
-    string | undefined
-  >();
+  const [selectedTransaction, setSelectedTransaction] =
+    useState<AdminTransaction | null>(null);
   const transactionsQuery = useAdminTransactions();
   const searchQuery = useAdminTransactionSearch(searchedMeterNumber);
   const usersQuery = useAdminUserRoles();
   const transactionDetailsQuery = useAdminTransactionDetails(
-    selectedTransactionId,
+    selectedTransaction?._id,
   );
   const users = usersQuery.data || [];
   const userById = new Map(users.map((user) => [user._id, user]));
@@ -1910,6 +1909,24 @@ function AdminTransactionsSection() {
 
     return userById.get(transactionUserId);
   };
+
+  const transactionDetails = transactionDetailsQuery.data ?? selectedTransaction;
+  const detailUser = transactionDetails
+    ? getUser(transactionDetails.userId)
+    : undefined;
+  const detailUserName =
+    detailUser && "fullName" in detailUser && typeof detailUser.fullName === "string"
+      ? detailUser.fullName
+      : detailUser
+        ? `${detailUser.firstName || ""} ${detailUser.lastName || ""}`.trim()
+        : "";
+  const detailUserLabel = detailUser
+    ? detailUserName || detailUser.email || detailUser._id
+    : transactionDetails
+      ? typeof transactionDetails.userId === "string"
+        ? transactionDetails.userId
+        : transactionDetails.userId._id
+      : "—";
 
   const renderTransactionRow = (
     transaction: (typeof transactions)[number],
@@ -1950,7 +1967,7 @@ function AdminTransactionsSection() {
         </td>
         <td className="px-4 py-3">
           <button
-            onClick={() => setSelectedTransactionId(transactionId)}
+            onClick={() => setSelectedTransaction(transaction)}
             className="text-xs font-semibold text-[#3730A3] hover:underline dark:text-[#818CF8]"
           >
             View
@@ -2132,9 +2149,9 @@ function AdminTransactionsSection() {
             </button>
           </div>
         ) : filteredTransactions.length ? (
-          <div className="overflow-x-auto">
+          <div className="max-h-[65dvh] overflow-auto">
             <table className="w-full min-w-[850px] text-left">
-              <thead className="bg-[#F9FAFB] text-xs uppercase text-[#9CA3AF] dark:bg-white/5">
+              <thead className="sticky top-0 z-10 bg-[#F9FAFB] text-xs uppercase text-[#9CA3AF] dark:bg-[#17192E]">
                 <tr>
                   <th className="px-4 py-3">User</th>
                   <th className="px-4 py-3">Reference</th>
@@ -2172,113 +2189,109 @@ function AdminTransactionsSection() {
       )}
 
       <Dialog
-        open={!!selectedTransactionId}
+        open={!!selectedTransaction}
         onOpenChange={(open) => {
-          if (!open) setSelectedTransactionId(undefined);
+          if (!open) setSelectedTransaction(null);
         }}
       >
-        <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl flex-col overflow-hidden">
+          <DialogHeader className="shrink-0 pr-6">
             <DialogTitle>Transaction Details</DialogTitle>
             <DialogDescription>
-              {transactionDetailsQuery.data?.reference
-                ? `Reference: ${transactionDetailsQuery.data.reference}`
-                : "Full details for the selected transaction"}
+              {transactionDetails?.reference ??
+                "Full details for the selected transaction"}
             </DialogDescription>
           </DialogHeader>
-          {transactionDetailsQuery.isLoading ? (
-            <p className="text-sm text-[#9CA3AF]">Loading transaction details...</p>
-          ) : transactionDetailsQuery.isError ? (
-            <div role="alert" className="text-sm text-red-600">
-              {transactionDetailsQuery.error instanceof Error
-                ? transactionDetailsQuery.error.message
-                : "Unable to load transaction details"}
-              <button
-                onClick={() => void transactionDetailsQuery.refetch()}
-                className="ml-3 font-semibold underline"
-              >
-                Retry
-              </button>
-            </div>
-          ) : transactionDetailsQuery.data ? (
-            <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-              {[
-                ["ID", transactionDetailsQuery.data._id],
-                ["Reference", transactionDetailsQuery.data.reference],
-                ["Amount", fmt(Number(transactionDetailsQuery.data.amount))],
-                ["Status", transactionDetailsQuery.data.status],
-                ["Meter number", transactionDetailsQuery.data.meterNumber || "—"],
-                ["Meter account number", transactionDetailsQuery.data.meterAccountNumber || "—"],
-                ["Description", transactionDetailsQuery.data.description || "—"],
-                ["Vend type", transactionDetailsQuery.data.vendType || "—"],
-                ["Subclass", transactionDetailsQuery.data.subclass || "—"],
-                ["Tariff", transactionDetailsQuery.data.tariff || "—"],
-                [
-                  "Units",
-                  transactionDetailsQuery.data.unitsActual === undefined
-                    ? "—"
-                    : `${transactionDetailsQuery.data.unitsActual} ${transactionDetailsQuery.data.unitName || ""}`.trim(),
-                ],
-                [
-                  "Transaction fees",
-                  transactionDetailsQuery.data.transactionFees === undefined
-                    ? "—"
-                    : fmt(transactionDetailsQuery.data.transactionFees),
-                ],
-                [
-                  "Vendor transaction fees",
-                  transactionDetailsQuery.data.vendorTransactionFees === undefined
-                    ? "—"
-                    : fmt(transactionDetailsQuery.data.vendorTransactionFees),
-                ],
-                [
-                  "Client transaction fees",
-                  transactionDetailsQuery.data.clientTransactionFees === undefined
-                    ? "—"
-                    : fmt(transactionDetailsQuery.data.clientTransactionFees),
-                ],
-                [
-                  "VAT",
-                  transactionDetailsQuery.data.vat === undefined
-                    ? "—"
-                    : fmt(transactionDetailsQuery.data.vat),
-                ],
-                ["Token (hex)", transactionDetailsQuery.data.tokenHex || "—"],
-                ["Token (decimal)", transactionDetailsQuery.data.tokenDec || "—"],
-                [
-                  "Vend time",
-                  transactionDetailsQuery.data.vendTime
-                    ? new Date(transactionDetailsQuery.data.vendTime).toLocaleString()
-                    : "—",
-                ],
-                [
-                  "Created",
-                  new Date(transactionDetailsQuery.data.createdAt).toLocaleString(),
-                ],
-                [
-                  "Updated",
-                  transactionDetailsQuery.data.updatedAt
-                    ? new Date(transactionDetailsQuery.data.updatedAt).toLocaleString()
-                    : "—",
-                ],
-                [
-                  "User",
-                  typeof transactionDetailsQuery.data.userId === "string"
-                    ? userById.get(transactionDetailsQuery.data.userId)?.email ||
-                      transactionDetailsQuery.data.userId
-                    : transactionDetailsQuery.data.userId.email ||
-                      transactionDetailsQuery.data.userId._id,
-                ],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-xl bg-[#F9FAFB] p-3 dark:bg-white/5">
-                  <dt className="text-xs text-[#9CA3AF]">{label}</dt>
-                  <dd className="mt-1 break-all font-medium text-[#374151] dark:text-gray-200">
-                    {value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          ) : null}
+          <div className="admin-dialog-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-2">
+            {transactionDetailsQuery.isLoading && (
+              <p className="text-sm text-[#9CA3AF]">Loading additional transaction details...</p>
+            )}
+            {transactionDetailsQuery.isError && (
+              <div role="alert" className="text-sm text-red-600">
+                {transactionDetailsQuery.error instanceof Error
+                  ? transactionDetailsQuery.error.message
+                  : "Unable to load transaction details"}
+                <button
+                  onClick={() => void transactionDetailsQuery.refetch()}
+                  className="ml-3 font-semibold underline"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+            {transactionDetails && (
+              <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                {[
+                  ["ID", transactionDetails._id],
+                  ["Reference", transactionDetails.reference],
+                  ["Amount", fmt(Number(transactionDetails.amount))],
+                  ["Status", transactionDetails.status],
+                  ["Meter number", transactionDetails.meterNumber || "—"],
+                  ["Meter account number", transactionDetails.meterAccountNumber || "—"],
+                  ["Description", transactionDetails.description || "—"],
+                  ["Vend type", transactionDetails.vendType || "—"],
+                  ["Subclass", transactionDetails.subclass || "—"],
+                  ["Tariff", transactionDetails.tariff || "—"],
+                  [
+                    "Units",
+                    transactionDetails.unitsActual === undefined
+                      ? "—"
+                      : `${transactionDetails.unitsActual} ${transactionDetails.unitName || ""}`.trim(),
+                  ],
+                  [
+                    "Transaction fees",
+                    transactionDetails.transactionFees === undefined
+                      ? "—"
+                      : fmt(transactionDetails.transactionFees),
+                  ],
+                  [
+                    "Vendor transaction fees",
+                    transactionDetails.vendorTransactionFees === undefined
+                      ? "—"
+                      : fmt(transactionDetails.vendorTransactionFees),
+                  ],
+                  [
+                    "Client transaction fees",
+                    transactionDetails.clientTransactionFees === undefined
+                      ? "—"
+                      : fmt(transactionDetails.clientTransactionFees),
+                  ],
+                  [
+                    "VAT",
+                    transactionDetails.vat === undefined
+                      ? "—"
+                      : fmt(transactionDetails.vat),
+                  ],
+                  ["Token (hex)", transactionDetails.tokenHex || "—"],
+                  ["Token (decimal)", transactionDetails.tokenDec || "—"],
+                  [
+                    "Vend time",
+                    transactionDetails.vendTime
+                      ? new Date(transactionDetails.vendTime).toLocaleString()
+                      : "—",
+                  ],
+                  [
+                    "Created",
+                    new Date(transactionDetails.createdAt).toLocaleString(),
+                  ],
+                  [
+                    "Updated",
+                    transactionDetails.updatedAt
+                      ? new Date(transactionDetails.updatedAt).toLocaleString()
+                      : "—",
+                  ],
+                  ["User", detailUserLabel],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-xl bg-[#F9FAFB] p-3 dark:bg-white/5">
+                    <dt className="text-xs text-[#9CA3AF]">{label}</dt>
+                    <dd className="mt-1 break-all font-medium text-[#374151] dark:text-gray-200">
+                      {value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

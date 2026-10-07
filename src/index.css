@@ -150,6 +150,43 @@
 }
 
 @layer components {
+  .admin-dialog-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #c7c9d6 transparent;
+    scrollbar-gutter: stable;
+  }
+
+  .admin-dialog-scrollbar::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .admin-dialog-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .admin-dialog-scrollbar::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background-color: #c7c9d6;
+    background-clip: content-box;
+  }
+
+  .admin-dialog-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: #9295a8;
+  }
+
+  .dark .admin-dialog-scrollbar {
+    scrollbar-color: #55586e transparent;
+  }
+
+  .dark .admin-dialog-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #55586e;
+  }
+
+  .dark .admin-dialog-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: #777b93;
+  }
+
   /* KPI Card styles */
   .kpi-card {
     @apply bg-card rounded-xl p-6 transition-all duration-200;
