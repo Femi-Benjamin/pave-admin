@@ -98,6 +98,13 @@ import {
   useDeleteAdminNotification,
   useDeleteAllAdminNotifications,
 } from "@/hooks/useAdmin";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type {
   AdminDailyRegistration,
   AdminSavingsGroup,
@@ -2164,19 +2171,21 @@ function AdminTransactionsSection() {
         </p>
       )}
 
-      {selectedTransactionId && (
-        <section className="rounded-2xl border border-[#F1F3FB] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111327]">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
-              Transaction Details
-            </h2>
-            <button
-              onClick={() => setSelectedTransactionId(undefined)}
-              className="text-sm font-semibold text-[#6B7280] hover:text-[#0D0F1C] dark:text-gray-300"
-            >
-              Close
-            </button>
-          </div>
+      <Dialog
+        open={!!selectedTransactionId}
+        onOpenChange={(open) => {
+          if (!open) setSelectedTransactionId(undefined);
+        }}
+      >
+        <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Transaction Details</DialogTitle>
+            <DialogDescription>
+              {transactionDetailsQuery.data?.reference
+                ? `Reference: ${transactionDetailsQuery.data.reference}`
+                : "Full details for the selected transaction"}
+            </DialogDescription>
+          </DialogHeader>
           {transactionDetailsQuery.isLoading ? (
             <p className="text-sm text-[#9CA3AF]">Loading transaction details...</p>
           ) : transactionDetailsQuery.isError ? (
@@ -2199,8 +2208,59 @@ function AdminTransactionsSection() {
                 ["Amount", fmt(Number(transactionDetailsQuery.data.amount))],
                 ["Status", transactionDetailsQuery.data.status],
                 ["Meter number", transactionDetailsQuery.data.meterNumber || "—"],
+                ["Meter account number", transactionDetailsQuery.data.meterAccountNumber || "—"],
                 ["Description", transactionDetailsQuery.data.description || "—"],
-                ["Created", new Date(transactionDetailsQuery.data.createdAt).toLocaleString()],
+                ["Vend type", transactionDetailsQuery.data.vendType || "—"],
+                ["Subclass", transactionDetailsQuery.data.subclass || "—"],
+                ["Tariff", transactionDetailsQuery.data.tariff || "—"],
+                [
+                  "Units",
+                  transactionDetailsQuery.data.unitsActual === undefined
+                    ? "—"
+                    : `${transactionDetailsQuery.data.unitsActual} ${transactionDetailsQuery.data.unitName || ""}`.trim(),
+                ],
+                [
+                  "Transaction fees",
+                  transactionDetailsQuery.data.transactionFees === undefined
+                    ? "—"
+                    : fmt(transactionDetailsQuery.data.transactionFees),
+                ],
+                [
+                  "Vendor transaction fees",
+                  transactionDetailsQuery.data.vendorTransactionFees === undefined
+                    ? "—"
+                    : fmt(transactionDetailsQuery.data.vendorTransactionFees),
+                ],
+                [
+                  "Client transaction fees",
+                  transactionDetailsQuery.data.clientTransactionFees === undefined
+                    ? "—"
+                    : fmt(transactionDetailsQuery.data.clientTransactionFees),
+                ],
+                [
+                  "VAT",
+                  transactionDetailsQuery.data.vat === undefined
+                    ? "—"
+                    : fmt(transactionDetailsQuery.data.vat),
+                ],
+                ["Token (hex)", transactionDetailsQuery.data.tokenHex || "—"],
+                ["Token (decimal)", transactionDetailsQuery.data.tokenDec || "—"],
+                [
+                  "Vend time",
+                  transactionDetailsQuery.data.vendTime
+                    ? new Date(transactionDetailsQuery.data.vendTime).toLocaleString()
+                    : "—",
+                ],
+                [
+                  "Created",
+                  new Date(transactionDetailsQuery.data.createdAt).toLocaleString(),
+                ],
+                [
+                  "Updated",
+                  transactionDetailsQuery.data.updatedAt
+                    ? new Date(transactionDetailsQuery.data.updatedAt).toLocaleString()
+                    : "—",
+                ],
                 [
                   "User",
                   typeof transactionDetailsQuery.data.userId === "string"
@@ -2219,8 +2279,8 @@ function AdminTransactionsSection() {
               ))}
             </dl>
           ) : null}
-        </section>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -3133,7 +3193,7 @@ export function AdminApp({
 
   return (
     <div
-      className={`${isDark ? "dark" : ""} fixed inset-0 flex h-screen w-screen overflow-hidden bg-[#F7F8FF] dark:bg-[#0A0B18] text-[#0D0F1C] dark:text-[#F0F2FF]`}
+      className={`${isDark ? "dark" : ""} fixed inset-0 flex h-[100dvh] w-full overflow-hidden bg-[#F7F8FF] dark:bg-[#0A0B18] text-[#0D0F1C] dark:text-[#F0F2FF]`}
       style={{
         backgroundColor: isDark ? "#0A0B18" : "#F7F8FF",
         color: isDark ? "#F0F2FF" : "#0D0F1C",
@@ -3267,7 +3327,7 @@ export function AdminApp({
       </aside>
 
       {/* Main Content Viewport */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full overflow-hidden">
         {/* Top Header Bar */}
         <header className="bg-white dark:bg-[#0D0F20] border-b border-[#F1F3FB] dark:border-white/10 px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3 flex-shrink-0 z-30">
           <div className="flex items-center gap-3 flex-1 min-w-0 max-w-lg">
@@ -3443,7 +3503,7 @@ export function AdminApp({
         </header>
 
         {/* Scrollable Page Body: Locked window scroll with clean interior scrolling */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 xl:p-8 overscroll-contain">
+        <main className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 xl:p-8 overscroll-contain">
           <AnimatePresence mode="wait">
             <motion.div
               key={section}
