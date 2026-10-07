@@ -2194,10 +2194,12 @@ function AdminTransactionsSection() {
           if (!open) setSelectedTransaction(null);
         }}
       >
-        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl flex-col overflow-hidden">
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl flex-col overflow-hidden border-[#D7DCE5] bg-white text-[#111827] shadow-2xl dark:border-white/15 dark:bg-[#111827] dark:text-[#F9FAFB]">
           <DialogHeader className="shrink-0 pr-6">
-            <DialogTitle>Transaction Details</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-[#111827] dark:text-[#F9FAFB]">
+              Transaction Details
+            </DialogTitle>
+            <DialogDescription className="break-all text-[#4B5563] dark:text-[#D1D5DB]">
               {transactionDetails?.reference ??
                 "Full details for the selected transaction"}
             </DialogDescription>
@@ -2282,9 +2284,14 @@ function AdminTransactionsSection() {
                   ],
                   ["User", detailUserLabel],
                 ].map(([label, value]) => (
-                  <div key={label} className="rounded-xl bg-[#F9FAFB] p-3 dark:bg-white/5">
-                    <dt className="text-xs text-[#9CA3AF]">{label}</dt>
-                    <dd className="mt-1 break-all font-medium text-[#374151] dark:text-gray-200">
+                  <div
+                    key={label}
+                    className="min-w-0 rounded-xl border border-[#DDE2EA] bg-[#F3F5F9] p-3 shadow-sm dark:border-white/15 dark:bg-[#202438]"
+                  >
+                    <dt className="text-xs font-semibold text-[#4B5563] dark:text-[#D1D5DB]">
+                      {label}
+                    </dt>
+                    <dd className="mt-1 break-all font-semibold leading-5 text-[#111827] dark:text-[#F9FAFB]">
                       {value}
                     </dd>
                   </div>
