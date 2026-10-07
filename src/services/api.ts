@@ -610,16 +610,24 @@ export const adminService = {
             : typeof point.date === "string"
               ? point.date
               : undefined;
-        const members =
-          typeof point.members === "number"
-            ? point.members
-            : typeof point.count === "number"
-              ? point.count
-              : typeof point.totalMembers === "number"
-                ? point.totalMembers
-                : typeof point.memberCount === "number"
-                  ? point.memberCount
-                  : undefined;
+        const members = [
+          point.members,
+          point.count,
+          point.totalMembers,
+          point.memberCount,
+          point.member_count,
+        ]
+          .map((value) => {
+            if (typeof value === "number") {
+              return Number.isFinite(value) ? value : undefined;
+            }
+            if (typeof value !== "string" || value.trim() === "") {
+              return undefined;
+            }
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : undefined;
+          })
+          .find((value) => value !== undefined);
         return month !== undefined && members !== undefined
           ? { month, members }
           : undefined;
@@ -995,9 +1003,16 @@ export const notificationService = {
 
     const notifications = response.data.notifications.map(
       (notification): AdminNotification | undefined => {
+        const id = isRecord(notification)
+          ? typeof notification.id === "string"
+            ? notification.id
+            : typeof notification._id === "string"
+              ? notification._id
+              : undefined
+          : undefined;
         if (
           !isRecord(notification) ||
-          typeof notification._id !== "string" ||
+          id === undefined ||
           typeof notification.userId !== "string" ||
           typeof notification.type !== "string" ||
           typeof notification.message !== "string" ||
@@ -1008,7 +1023,7 @@ export const notificationService = {
           return undefined;
         }
         return {
-          id: notification._id,
+          id,
           userId: notification.userId,
           type: notification.type,
           message: notification.message,
