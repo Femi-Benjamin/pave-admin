@@ -1,7 +1,7 @@
 // PAVE Admin - Auth Context
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminUser } from '@/types';
 import { authService } from '@/services/api';
 import { AuthContext, STORAGE_KEY } from './auth-context-def';
@@ -9,6 +9,7 @@ import { AuthContext, STORAGE_KEY } from './auth-context-def';
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [admin, setAdmin] = useState<AdminUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const {
     mutateAsync: loginAdmin,
     reset: resetLogin,
@@ -25,6 +26,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
   });
 
+  useEffect(() => {
+    const handleExpiredSession = () => {
+      setAdmin(null);
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem('pave_admin_token');
+      queryClient.clear();
+    };
+
+    window.addEventListener('pave:auth-expired', handleExpiredSession);
+    return () => window.removeEventListener('pave:auth-expired', handleExpiredSession);
+  }, [queryClient]);
   // Check for existing session on mount
   useEffect(() => {
     const storedAuth = localStorage.getItem(STORAGE_KEY);

@@ -41,6 +41,15 @@ function failedResponse<T>(response: ApiResponse<unknown>): ApiResponse<T> {
   };
 }
 
+const AUTH_EXPIRED_EVENT = "pave:auth-expired";
+
+function hasExpiredTokenMessage(body: unknown): boolean {
+  if (!isRecord(body)) return false;
+  const message = [body.message, body.error]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ");
+  return /\b(?:token|jwt|session)\b.{0,40}\b(?:expired|invalid)\b|\bjwt expired\b/i.test(message);
+}
 function getStoredToken(): string | undefined {
   const token = localStorage.getItem("pave_admin_token");
   if (token) return token;
@@ -84,10 +93,18 @@ async function requestApi(
       ? await response.json()
       : undefined;
 
+    const isLoginRequest = endpoint.endsWith("/admin/adminLogin");
+    const tokenExpired =
+      response.status === 401 ||
+      ((response.status === 403 || response.ok) && hasExpiredTokenMessage(body));
+    if (token && !isLoginRequest && tokenExpired && typeof window !== "undefined") {
+      window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+    }
+
     if (!response.ok) {
       return {
         success: false,
-        error: responseMessage(body, `Request failed (${response.status})`),
+        error: responseMessage(body, "Request failed (" + response.status + ")"),
       };
     }
     if (isRecord(body) && (body.success === false || body.status === false)) {
@@ -140,8 +157,14 @@ function unavailable<T>(capability: string): ApiResponse<T> {
 
 function mapAdminRole(value: unknown): AdminUserRole | undefined {
   if (!isRecord(value)) return undefined;
+  const id =
+    typeof value._id === "string"
+      ? value._id
+      : typeof value.id === "string"
+        ? value.id
+        : undefined;
   if (
-    typeof value._id !== "string" ||
+    id === undefined ||
     typeof value.email !== "string" ||
     typeof value.role !== "string"
   ) {
@@ -149,7 +172,7 @@ function mapAdminRole(value: unknown): AdminUserRole | undefined {
   }
 
   return {
-    _id: value._id,
+    _id: id,
     email: value.email,
     role: value.role,
     firstName: typeof value.firstName === "string" ? value.firstName : "",
@@ -160,7 +183,6 @@ function mapAdminRole(value: unknown): AdminUserRole | undefined {
       : {}),
   };
 }
-
 function mapVendingPoints(value: unknown): AdminVendingPoint[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const points = value.map((point): AdminVendingPoint | undefined => {
