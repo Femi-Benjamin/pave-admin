@@ -109,6 +109,13 @@ import type {
   AdminDailyRegistration,
   AdminSavingsGroup,
 } from "@/services/api";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 import type {
   AdminTransaction,
@@ -143,6 +150,7 @@ export interface Member {
   phone?: string;
   kyc: string;
   joined: string;
+  createdAt?: string;
   wallet?: number;
   savings?: number;
   status: string;
@@ -209,7 +217,8 @@ function mapAdminRoleToMember(user: AdminUserRole): Member {
     name: `${user.firstName} ${user.lastName}`.trim() || user.email,
     email: user.email,
     kyc: "Not available",
-    joined: "Not available",
+    joined: user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "Not available",
+    ...(user.createdAt ? { createdAt: user.createdAt } : {}),
     ...(balance !== undefined ? { wallet: balance } : {}),
     status: user.isBlocked ? "Blocked" : "Not blocked",
     group: "Not available",
@@ -410,6 +419,7 @@ function DashboardSection({
   const transactionsQuery = useAdminTransactions();
   const revenueData = revenueQuery.data ?? [];
   const memberGrowth = memberGrowthQuery.data ?? [];
+  const [selectedMemberGrowth, setSelectedMemberGrowth] = useState<{ month: string; members: number } | null>(null);
   const recentTransactions = [...(transactionsQuery.data?.data ?? [])]
     .sort(
       (left, right) =>
@@ -652,12 +662,31 @@ function DashboardSection({
                 dataKey="members"
                 fill="#3730A3"
                 radius={[6, 6, 0, 0]}
-                name="Members"
+                name="Registrations"
+                cursor="pointer"
+                onClick={(_, index) => {
+                  const point = memberGrowth[index];
+                  if (point) setSelectedMemberGrowth(point);
+                }}
               />
             </BarChart>
           </ResponsiveContainer>
           )}
-        </div>
+                  {selectedMemberGrowth ? (
+            <div className="mt-3 flex items-center justify-between rounded-xl border border-[#DDE3FF] bg-[#F5F6FF] px-4 py-3 dark:border-[#818CF8]/20 dark:bg-[#818CF8]/10" role="status">
+              <div>
+                <p className="text-xs font-medium text-[#6B7280] dark:text-[#A5B4FC]">{selectedMemberGrowth.month}</p>
+                <p className="text-sm font-semibold text-[#1F2937] dark:text-[#F0F2FF]">
+                  {selectedMemberGrowth.members.toLocaleString()} registered users
+                </p>
+              </div>
+              <button type="button" onClick={() => setSelectedMemberGrowth(null)} className="rounded-lg px-2 py-1 text-xs font-semibold text-[#3730A3] hover:bg-white dark:text-[#A5B4FC] dark:hover:bg-white/10">
+                Clear
+              </button>
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-[#9CA3AF]">Select a month to see its registration total.</p>
+          )}</div>
 
         <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
           <h3
@@ -727,6 +756,8 @@ function DashboardSection({
 }
 
 // ─── Members Section ──────────────────────────────────────────────────────────
+type RegistrationPeriod = "today" | "7days" | "month" | "all";
+
 function MembersSection({
   members,
   isLoading,
@@ -746,6 +777,32 @@ function MembersSection({
 }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
+  const [registrationPeriod, setRegistrationPeriod] = useState<RegistrationPeriod>("month");
+  const now = new Date();
+  const periodStart = new Date(now);
+  periodStart.setHours(0, 0, 0, 0);
+  if (registrationPeriod === "7days") {
+    periodStart.setDate(periodStart.getDate() - 6);
+  } else if (registrationPeriod === "month") {
+    periodStart.setDate(1);
+  }
+  const datedMembers = members.filter((member) => {
+    if (!member.createdAt) return false;
+    return Number.isFinite(new Date(member.createdAt).getTime());
+  });
+  const registrationCount =
+    members.length > 0 && datedMembers.length === 0
+      ? undefined
+      : datedMembers.filter((member) => {
+          const createdAt = new Date(member.createdAt as string);
+          return createdAt <= now && (registrationPeriod === "all" || createdAt >= periodStart);
+        }).length;
+  const registrationPeriodLabel = {
+    today: "Today",
+    "7days": "Last 7 days",
+    month: "This month",
+    all: "All time",
+  }[registrationPeriod];
 
   const filtered = members.filter(
     (m) =>
@@ -772,7 +829,36 @@ function MembersSection({
           </button>
         }
       />
-      <div className="bg-white dark:bg-[#111327] rounded-2xl border border-[#F1F3FB] dark:border-white/10 overflow-hidden shadow-sm">
+      <section className="mb-4 flex flex-col gap-4 rounded-2xl border border-[#E8EAF4] bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#111327] sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#8A91A5]">New registrations</p>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-[#111827] dark:text-[#F0F2FF]">
+              {isLoading ? "…" : error ? "Unavailable" : registrationCount === undefined ? "Unavailable" : registrationCount.toLocaleString()}
+            </span>
+            <span className="text-sm text-[#6B7280] dark:text-[#94A3B8]">{registrationPeriodLabel}</span>
+          </div>
+          <p className="mt-1 text-xs text-[#9CA3AF]">
+            {datedMembers.length.toLocaleString()} of {members.length.toLocaleString()} members have a registration date.
+          </p>
+        </div>
+        <div className="w-full sm:w-52">
+          <label htmlFor="member-registration-period" className="mb-1.5 block text-xs font-medium text-[#6B7280] dark:text-[#94A3B8]">
+            Registration period
+          </label>
+          <Select value={registrationPeriod} onValueChange={(value) => setRegistrationPeriod(value as RegistrationPeriod)}>
+            <SelectTrigger id="member-registration-period" className="h-10 rounded-xl border-[#E1E5EF] bg-[#F8F9FC] dark:border-white/10 dark:bg-white/5">
+              <SelectValue placeholder="Choose a period" />
+            </SelectTrigger>
+            <SelectContent position="popper" className="rounded-xl">
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="7days">Last 7 days</SelectItem>
+              <SelectItem value="month">This month</SelectItem>
+              <SelectItem value="all">All time</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </section>      <div className="bg-white dark:bg-[#111327] rounded-2xl border border-[#F1F3FB] dark:border-white/10 overflow-hidden shadow-sm">
         <div className="p-4 border-b border-[#F1F3FB] dark:border-white/10 flex flex-col sm:flex-row gap-3">
           <div className="flex-1 flex items-center gap-2 bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-2.5">
             <Search size={16} className="text-[#9CA3AF]" />
@@ -1613,7 +1699,15 @@ function SavingsProgramsSection({
           <button onClick={onRetry} className="font-semibold text-[#3730A3]">Retry</button>
         </div>
       ) : groups.length === 0 ? (
-        <div className="rounded-2xl bg-white p-8 text-center text-sm text-[#9CA3AF] dark:bg-[#111327]">No savings groups found.</div>
+        <div className="rounded-2xl border border-dashed border-[#D7DDEC] bg-white p-10 text-center dark:border-white/10 dark:bg-[#111327]">
+          <h3 className="text-base font-semibold text-[#1F2937] dark:text-[#F0F2FF]">No savings programs yet</h3>
+          <p className="mx-auto mt-2 max-w-md text-sm text-[#6B7280] dark:text-[#94A3B8]">
+            The savings-groups API returned no programs. Create the first program to get started.
+          </p>
+          <button type="button" onClick={() => setShowForm(true)} className="mt-5 rounded-xl bg-[#3730A3] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#312E81]">
+            Create first program
+          </button>
+        </div>
       ) : (
       <div className="flex flex-col gap-4">
         {groups.map((p) => (
@@ -2113,23 +2207,24 @@ function AdminTransactionsSection() {
                 : `${transactionsQuery.data?.totalTransactions ?? 0} transactions`}
             </p>
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <span className="text-xs text-[#6B7280] dark:text-[#94A3B8]">
+          <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+            <label id="transaction-user-filter-label" className="text-xs font-medium text-[#6B7280] dark:text-[#94A3B8]">
               Filter by user
-            </span>
-            <select
-              value={selectedUserId}
-              onChange={(event) => setSelectedUserId(event.target.value)}
-              className="max-w-[240px] rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-2 text-sm dark:border-white/10 dark:bg-[#1E2140]"
-            >
-              <option value="all">All users</option>
-              {users.map((user) => (
-                <option key={user._id} value={user._id}>
-                  {user.firstName} {user.lastName} ({user.role})
-                </option>
-              ))}
-            </select>
-          </label>
+            </label>
+            <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+              <SelectTrigger aria-labelledby="transaction-user-filter-label" className="h-10 w-full rounded-xl border-[#E1E5EF] bg-[#F8F9FC] text-sm shadow-sm dark:border-white/10 dark:bg-white/5 sm:w-[250px]">
+                <SelectValue placeholder="All users" />
+              </SelectTrigger>
+              <SelectContent position="popper" className="max-h-72 min-w-[250px] rounded-xl">
+                <SelectItem value="all">All users</SelectItem>
+                {users.map((user) => (
+                  <SelectItem key={user._id} value={user._id}>
+                    {(user.firstName + " " + user.lastName).trim() || user.email} ({user.role})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {transactionsQuery.isLoading ? (

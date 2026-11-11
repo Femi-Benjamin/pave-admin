@@ -51,21 +51,18 @@ function hasExpiredTokenMessage(body: unknown): boolean {
   return /\b(?:token|jwt|session)\b.{0,40}\b(?:expired|invalid)\b|\bjwt expired\b/i.test(message);
 }
 function getStoredToken(): string | undefined {
-  const token = localStorage.getItem("pave_admin_token");
+  const token = sessionStorage.getItem("pave_admin_token");
   if (token) return token;
-
-  const storedAuth = localStorage.getItem("pave_admin_auth");
+  const storedAuth = sessionStorage.getItem("pave_admin_auth");
   if (!storedAuth) return undefined;
-
   try {
     const parsed: unknown = JSON.parse(storedAuth);
-    return isRecord(parsed) && typeof parsed.token === "string"
-      ? parsed.token
-      : undefined;
+    return isRecord(parsed) && typeof parsed.token === "string" ? parsed.token : undefined;
   } catch {
     return undefined;
   }
 }
+
 
 async function requestApi(
   endpoint: string,
@@ -178,6 +175,7 @@ function mapAdminRole(value: unknown): AdminUserRole | undefined {
     firstName: typeof value.firstName === "string" ? value.firstName : "",
     lastName: typeof value.lastName === "string" ? value.lastName : "",
     isBlocked: value.isBlocked === true,
+    ...(typeof value.createdAt === "string" ? { createdAt: value.createdAt } : {}),
     ...(typeof value.wallet === "string" || typeof value.wallet === "number"
       ? { wallet: String(value.wallet) }
       : {}),
@@ -1003,7 +1001,7 @@ export const adminService = {
     return apiFetch<AdminSavingsGroup[]>("/api/v1/group-saving/get-all-groups");
   },
   createSavingsGroup(input: CreateAdminSavingsGroupInput) {
-    return apiFetch<AdminSavingsGroup>("/api/v1/group-saving/create-group", {
+    return apiFetch<AdminSavingsGroup>("/api/v1/group-saving/create-group-saving", {
       method: "POST",
       body: JSON.stringify(input),
     });

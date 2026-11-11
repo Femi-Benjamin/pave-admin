@@ -134,6 +134,7 @@ export interface AdminUserRole {
   role: string;
   isBlocked: boolean;
   wallet?: string;
+  createdAt?: string;
 }
 
 export type KYCStatus = 'pending' | 'approved' | 'rejected';

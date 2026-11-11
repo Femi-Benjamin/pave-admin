@@ -19,9 +19,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       authService.login(email, password),
     onSuccess: (authenticatedAdmin) => {
       setAdmin(authenticatedAdmin);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(authenticatedAdmin));
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(authenticatedAdmin));
       if (authenticatedAdmin.token) {
-        localStorage.setItem('pave_admin_token', authenticatedAdmin.token);
+        sessionStorage.setItem('pave_admin_token', authenticatedAdmin.token);
       }
     },
   });
@@ -29,7 +29,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const handleExpiredSession = () => {
       setAdmin(null);
+      sessionStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem('pave_admin_token');
       localStorage.removeItem('pave_admin_token');
       queryClient.clear();
     };
@@ -39,13 +41,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [queryClient]);
   // Check for existing session on mount
   useEffect(() => {
-    const storedAuth = localStorage.getItem(STORAGE_KEY);
+    const storedAuth = sessionStorage.getItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem('pave_admin_token');
     if (storedAuth) {
       try {
         const parsed = JSON.parse(storedAuth);
         setAdmin(parsed);
-      } catch (e) {
-        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        sessionStorage.removeItem(STORAGE_KEY);
       }
     }
     setIsLoading(false);
@@ -73,11 +77,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await authService.logout();
     } finally {
       setAdmin(null);
+      sessionStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem('pave_admin_token');
       localStorage.removeItem('pave_admin_token');
+      queryClient.clear();
       setIsLoading(false);
     }
-  }, []);
+  }, [queryClient]);
 
   return (
     <AuthContext.Provider
