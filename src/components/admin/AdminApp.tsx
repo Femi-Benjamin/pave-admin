@@ -778,6 +778,8 @@ function MembersSection({
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
   const [registrationPeriod, setRegistrationPeriod] = useState<RegistrationPeriod>("month");
+  const [memberPage, setMemberPage] = useState(1);
+  const pageSize = 25;
   const now = new Date();
   const periodStart = new Date(now);
   periodStart.setHours(0, 0, 0, 0);
@@ -790,13 +792,16 @@ function MembersSection({
     if (!member.createdAt) return false;
     return Number.isFinite(new Date(member.createdAt).getTime());
   });
+  const matchesRegistrationPeriod = (member: Member) => {
+    if (registrationPeriod === "all") return true;
+    if (!member.createdAt || !Number.isFinite(new Date(member.createdAt).getTime())) return false;
+    const createdAt = new Date(member.createdAt);
+    return createdAt <= now && createdAt >= periodStart;
+  };
   const registrationCount =
     members.length > 0 && datedMembers.length === 0
       ? undefined
-      : datedMembers.filter((member) => {
-          const createdAt = new Date(member.createdAt as string);
-          return createdAt <= now && (registrationPeriod === "all" || createdAt >= periodStart);
-        }).length;
+      : datedMembers.filter(matchesRegistrationPeriod).length;
   const registrationPeriodLabel = {
     today: "Today",
     "7days": "Last 7 days",
@@ -806,6 +811,7 @@ function MembersSection({
 
   const filtered = members.filter(
     (m) =>
+      matchesRegistrationPeriod(m) &&
       (filter === "All" ||
         (filter === "Blocked" && m.status === "Blocked") ||
         (filter === "Not blocked" && m.status === "Not blocked")) &&
@@ -813,6 +819,11 @@ function MembersSection({
         m.email.toLowerCase().includes(search.toLowerCase()) ||
         (m.phone || "").includes(search)),
   );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(memberPage, totalPages);
+  const visibleMembers = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const firstVisibleMember = filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const lastVisibleMember = Math.min(currentPage * pageSize, filtered.length);
 
   return (
     <div>
@@ -846,7 +857,7 @@ function MembersSection({
           <label htmlFor="member-registration-period" className="mb-1.5 block text-xs font-medium text-[#6B7280] dark:text-[#94A3B8]">
             Registration period
           </label>
-          <Select value={registrationPeriod} onValueChange={(value) => setRegistrationPeriod(value as RegistrationPeriod)}>
+          <Select value={registrationPeriod} onValueChange={(value) => { setRegistrationPeriod(value as RegistrationPeriod); setMemberPage(1); }}>
             <SelectTrigger id="member-registration-period" className="h-10 rounded-xl border-[#E1E5EF] bg-[#F8F9FC] dark:border-white/10 dark:bg-white/5">
               <SelectValue placeholder="Choose a period" />
             </SelectTrigger>
@@ -864,7 +875,7 @@ function MembersSection({
             <Search size={16} className="text-[#9CA3AF]" />
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setMemberPage(1); }}
               placeholder="Search members..."
               className="flex-1 bg-transparent text-sm outline-none text-[#0D0F1C] dark:text-[#F0F2FF] placeholder:text-[#9CA3AF]"
             />
@@ -873,7 +884,7 @@ function MembersSection({
             {["All", "Blocked", "Not blocked"].map((f) => (
               <button
                 key={f}
-                onClick={() => setFilter(f)}
+                onClick={() => { setFilter(f); setMemberPage(1); }}
                 className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
                   filter === f
                     ? "bg-[#3730A3] text-white"
@@ -894,12 +905,19 @@ function MembersSection({
           </div>
         ) : filtered.length === 0 ? (
           <div className="p-8 text-center text-sm text-[#9CA3AF]">
-            {members.length === 0 ? "No users found." : "No users match these filters."}
+            {members.length === 0 ? "No users found." : `No users registered ${registrationPeriodLabel.toLowerCase()} match these filters.`}
           </div>
         ) : (
-        <div className="overflow-x-auto">
+        <>
+        <div className="flex flex-col gap-1 border-b border-[#F1F3FB] px-4 py-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm font-semibold text-[#1F2937] dark:text-[#F0F2FF]">
+            {filtered.length.toLocaleString()} members registered {registrationPeriodLabel.toLowerCase()}
+          </p>
+          <p className="text-xs text-[#8A91A5]">Showing {firstVisibleMember.toLocaleString()}–{lastVisibleMember.toLocaleString()}</p>
+        </div>
+        <div className="max-h-[min(65vh,640px)] overflow-auto">
           <table className="w-full min-w-[650px]">
-            <thead className="bg-[#F9FAFB] dark:bg-white/5 border-b border-[#F1F3FB] dark:border-white/10">
+            <thead className="sticky top-0 z-10 bg-[#F9FAFB] dark:bg-[#17192F] border-b border-[#F1F3FB] dark:border-white/10">
               <tr>
                 {[
                   "Member",
@@ -920,7 +938,7 @@ function MembersSection({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F9FAFB] dark:divide-white/5">
-              {filtered.map((m) => (
+              {visibleMembers.map((m) => (
                 <tr
                   key={m.id}
                   className="hover:bg-[#F9FAFB] dark:hover:bg-white/5 transition-colors"
@@ -978,6 +996,14 @@ function MembersSection({
             </tbody>
           </table>
         </div>
+        <div className="flex flex-col gap-3 border-t border-[#F1F3FB] px-4 py-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-[#8A91A5]">Page {currentPage} of {totalPages} · 25 members per page</p>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setMemberPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1} className="rounded-lg border border-[#E1E5EF] px-3 py-1.5 text-sm font-medium text-[#374151] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:text-gray-300">Previous</button>
+            <button type="button" onClick={() => setMemberPage((page) => Math.min(totalPages, page + 1))} disabled={currentPage === totalPages} className="rounded-lg border border-[#E1E5EF] px-3 py-1.5 text-sm font-medium text-[#374151] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:text-gray-300">Next</button>
+          </div>
+        </div>
+        </>
         )}
       </div>
     </div>
