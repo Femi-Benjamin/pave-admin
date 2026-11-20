@@ -1,7 +1,6 @@
 import type {
   AdminRole,
   AdminUser,
-  ActivityLog,
   AdminBlockUserResponse,
   AdminKycApprovalResponse,
   AdminPendingKycUser,
@@ -13,16 +12,6 @@ import type {
   ApiResponse,
   CreateAdminAccountInput,
   CreateAdminAccountResponse,
-  DashboardKPIs,
-  KYCStatus,
-  PaginatedResponse,
-  SavingsPlan,
-  ThriftPlan,
-  Transaction,
-  TransactionFilters,
-  User,
-  UserFilters,
-  Wallet,
 } from "@/types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") || "";
@@ -143,13 +132,6 @@ async function apiFetchRaw<T>(
   return response.success
     ? { ...response, data: response.data as T }
     : failedResponse<T>(response);
-}
-
-function unavailable<T>(capability: string): ApiResponse<T> {
-  return {
-    success: false,
-    error: `The documented API collection does not provide ${capability}.`,
-  };
 }
 
 function mapAdminRole(value: unknown): AdminUserRole | undefined {
@@ -362,6 +344,15 @@ export interface AdminNotifications {
   readCount: number;
 }
 
+export interface AdminAuditLog {
+  id: string;
+  action: string;
+  actor: string;
+  description: string;
+  createdAt: string;
+  raw: Record<string, unknown>;
+}
+
 export interface AdminSavingsGroup {
   id: string;
   userId: string;
@@ -394,6 +385,16 @@ export interface CreateAdminSavingsGroupInput {
   endDate: string;
   visibility: string;
   image: string;
+}
+
+// The API serializes decimal columns as strings (e.g. "500000.00").
+function normalizeSavingsGroup(group: AdminSavingsGroup): AdminSavingsGroup {
+  return {
+    ...group,
+    targetAmount: Number(group.targetAmount) || 0,
+    contributionAmount: Number(group.contributionAmount) || 0,
+    currentBalance: Number(group.currentBalance) || 0,
+  };
 }
 
 export const authService = {
@@ -446,8 +447,23 @@ export const authService = {
       token,
     };
   },
-  async forgotPassword(_email: string) {
-    return unavailable<{ message: string }>("password reset");
+  async forgotPassword(email: string): Promise<ApiResponse<{ message: string }>> {
+    const response = await requestApi("/api/v1/auth/forgotPassword", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+    return response.success
+      ? { success: true, data: { message: response.message || "Reset token sent" } }
+      : failedResponse<{ message: string }>(response);
+  },
+  async resetPassword(token: string, password: string): Promise<ApiResponse<{ message: string }>> {
+    const response = await requestApi("/api/v1/auth/resetPassword", {
+      method: "POST",
+      body: JSON.stringify({ token, password }),
+    });
+    return response.success
+      ? { success: true, data: { message: response.message || "Password reset successful" } }
+      : failedResponse<{ message: string }>(response);
   },
   async logout(): Promise<ApiResponse<void>> {
     return { success: true };
@@ -997,14 +1013,67 @@ export const adminService = {
       },
     };
   },
-  getSavingsGroups() {
-    return apiFetch<AdminSavingsGroup[]>("/api/v1/group-saving/get-all-groups");
+  async getSavingsGroups(): Promise<ApiResponse<AdminSavingsGroup[]>> {
+    const response = await apiFetch<AdminSavingsGroup[]>("/api/v1/group-saving/get-all-groups");
+    if (!response.success || !Array.isArray(response.data)) return response;
+    return { ...response, data: response.data.map(normalizeSavingsGroup) };
   },
   createSavingsGroup(input: CreateAdminSavingsGroupInput) {
     return apiFetch<AdminSavingsGroup>("/api/v1/group-saving/create-group-saving", {
       method: "POST",
       body: JSON.stringify(input),
     });
+  },
+};
+
+const str = (v: unknown): string | undefined =>
+  typeof v === "string" && v.trim() ? v : undefined;
+
+// The collection ships no example response for audit-logs, so the parser is
+// deliberately tolerant about field names and keeps the raw record.
+function mapAuditLog(value: unknown, index: number): AdminAuditLog | undefined {
+  if (!isRecord(value)) return undefined;
+  const actorRecord = [value.user, value.admin, value.actor, value.userId].find(isRecord);
+  const actor =
+    str(value.email) ??
+    str(value.userEmail) ??
+    str(value.actorEmail) ??
+    (actorRecord
+      ? str(actorRecord.email) ??
+        str(actorRecord.fullName) ??
+        [str(actorRecord.firstName), str(actorRecord.lastName)].filter(Boolean).join(" ")
+      : undefined) ??
+    str(value.userId) ??
+    "System";
+  return {
+    id: str(value.id) ?? str(value._id) ?? `log-${index}`,
+    action: str(value.action) ?? str(value.event) ?? str(value.type) ?? "Activity",
+    actor,
+    description:
+      str(value.description) ?? str(value.message) ?? str(value.details) ?? "",
+    createdAt: str(value.createdAt) ?? str(value.timestamp) ?? str(value.date) ?? "",
+    raw: value,
+  };
+}
+
+export const auditService = {
+  async getLogs(): Promise<ApiResponse<AdminAuditLog[]>> {
+    const response = await apiFetch<unknown>("/api/v1/audit/audit-logs");
+    if (!response.success) return failedResponse<AdminAuditLog[]>(response);
+    const data = response.data;
+    const rows = Array.isArray(data)
+      ? data
+      : isRecord(data)
+        ? [data.logs, data.auditLogs, data.data, data.rows].find(Array.isArray)
+        : undefined;
+    if (!Array.isArray(rows)) {
+      return { success: false, error: "The audit-logs response did not contain a list." };
+    }
+    const logs = rows
+      .map(mapAuditLog)
+      .filter((log): log is AdminAuditLog => log !== undefined)
+      .sort((a, b) => Date.parse(b.createdAt || "") - Date.parse(a.createdAt || "") || 0);
+    return { ...response, data: logs };
   },
 };
 
@@ -1111,66 +1180,4 @@ export const notificationService = {
       ? { success: true, message: response.message }
       : failedResponse<void>(response);
   },
-};
-
-export const dashboardService = {
-  getKPIs: () => unavailable<DashboardKPIs>("the legacy dashboard KPI endpoint"),
-  getTransactionVolumeChart: () =>
-    unavailable<{ date: string; value: number }[]>("the legacy transaction chart endpoint"),
-  getSavingsVolumeChart: () =>
-    unavailable<{ date: string; value: number }[]>("the legacy savings chart endpoint"),
-  getRecentActivity: () => unavailable<ActivityLog[]>("an admin activity feed"),
-};
-
-export const usersService = {
-  getUsers: (_page?: number, _limit?: number, _filters?: UserFilters) =>
-    unavailable<PaginatedResponse<User>>("the legacy paginated users endpoint"),
-  getUserById: (_id: string) => unavailable<User>("the legacy user-by-id endpoint"),
-};
-
-export const kycService = {
-  getSubmissions: (
-    _status?: KYCStatus | "all",
-    _page?: number,
-    _limit?: number,
-  ) => unavailable<PaginatedResponse<import("@/types").KYCSubmission>>(
-    "the legacy paginated KYC endpoint",
-  ),
-  getSubmissionById: (_id: string) =>
-    unavailable<import("@/types").KYCSubmission>("the legacy KYC-by-id endpoint"),
-  approveKYC: (_id: string) =>
-    unavailable<import("@/types").KYCSubmission>("the legacy KYC approval endpoint"),
-  rejectKYC: (_id: string, _reason: string) =>
-    unavailable<import("@/types").KYCSubmission>("KYC rejection"),
-};
-
-export const walletService = {
-  getWallets: (_page?: number, _limit?: number) =>
-    unavailable<PaginatedResponse<Wallet>>("an admin wallet listing endpoint"),
-  blockWallet: (_id: string) => unavailable<Wallet>("wallet blocking by ID"),
-  unblockWallet: (_id: string) => unavailable<Wallet>("wallet unblocking"),
-};
-
-export const transactionService = {
-  getTransactions: (
-    _page?: number,
-    _limit?: number,
-    _filters?: TransactionFilters,
-  ) => unavailable<PaginatedResponse<Transaction>>("the legacy transaction listing endpoint"),
-  getTransactionById: (_id: string) =>
-    unavailable<Transaction>("the legacy transaction-by-id endpoint"),
-};
-
-export const savingsService = {
-  getSavingsPlans: (_page?: number, _limit?: number) =>
-    unavailable<PaginatedResponse<SavingsPlan>>("an admin personal-savings listing endpoint"),
-  getSavingsPlanById: (_id: string) =>
-    unavailable<SavingsPlan>("an admin personal-savings-by-id endpoint"),
-};
-
-export const thriftService = {
-  getThriftPlans: (_page?: number, _limit?: number) =>
-    unavailable<PaginatedResponse<ThriftPlan>>("an admin thrift-plan listing endpoint"),
-  getThriftPlanById: (_id: string) =>
-    unavailable<ThriftPlan>("an admin thrift-plan-by-id endpoint"),
 };

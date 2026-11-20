@@ -14,6 +14,10 @@ export default function ForgotPassword() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [token, setToken] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isDone, setIsDone] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,10 +29,31 @@ export default function ForgotPassword() {
     if (result.success) {
       setIsSuccess(true);
     } else {
-      setError(result.error || "Failed to send reset link");
+      setError(result.error || "Failed to send reset code");
     }
 
     setIsLoading(false);
+  };
+
+  const handleReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    setIsLoading(true);
+    const result = await authService.resetPassword(token.trim(), password);
+    setIsLoading(false);
+    if (result.success) {
+      setIsDone(true);
+    } else {
+      setError(result.error || "Unable to reset password");
+    }
   };
 
   return (
@@ -51,7 +76,7 @@ export default function ForgotPassword() {
           </span>
         </div>
 
-        {isSuccess ? (
+        {isDone ? (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -60,20 +85,53 @@ export default function ForgotPassword() {
             <div className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle2 className="w-8 h-8 text-success" />
             </div>
-            <h2 className="text-2xl font-bold text-foreground mb-2">
-              Check your email
-            </h2>
-            <p className="text-muted-foreground mb-8">
-              We've sent a password reset link to{" "}
-              <span className="text-foreground font-medium">{email}</span>
-            </p>
+            <h2 className="text-2xl font-bold text-foreground mb-2">Password updated</h2>
+            <p className="text-muted-foreground mb-8">You can now sign in with your new password.</p>
             <Link to="/login">
-              <Button variant="outline" className="w-full h-12">
+              <Button className="w-full h-12">Back to login</Button>
+            </Link>
+          </motion.div>
+        ) : isSuccess ? (
+          <motion.form
+            onSubmit={handleReset}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="space-y-6"
+          >
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-foreground mb-2">Enter your reset code</h2>
+              <p className="text-muted-foreground">
+                We sent a reset code to{" "}
+                <span className="text-foreground font-medium">{email}</span>
+              </p>
+            </div>
+            {error && (
+              <div role="alert" className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
+                {error}
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="token">Reset code</Label>
+              <Input id="token" value={token} onChange={(e) => setToken(e.target.value)} className="h-12" required autoComplete="one-time-code" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">New password</Label>
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="h-12" required autoComplete="new-password" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm">Confirm new password</Label>
+              <Input id="confirm" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="h-12" required autoComplete="new-password" />
+            </div>
+            <Button type="submit" className="w-full h-12 text-base gradient-hero hover:opacity-90 transition-opacity" disabled={isLoading}>
+              {isLoading ? (<><Loader2 className="w-5 h-5 mr-2 animate-spin" />Resetting...</>) : "Reset password"}
+            </Button>
+            <Link to="/login">
+              <Button type="button" variant="ghost" className="w-full h-12 text-muted-foreground">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to login
               </Button>
             </Link>
-          </motion.div>
+          </motion.form>
         ) : (
           <>
             <div className="text-center mb-8">
@@ -84,7 +142,7 @@ export default function ForgotPassword() {
                 Forgot password?
               </h2>
               <p className="text-muted-foreground">
-                Enter your email and we'll send you a reset link
+                Enter your email and we'll send you a reset code
               </p>
             </div>
 
@@ -124,7 +182,7 @@ export default function ForgotPassword() {
                     Sending...
                   </>
                 ) : (
-                  "Send reset link"
+                  "Send reset code"
                 )}
               </Button>
 

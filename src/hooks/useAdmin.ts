@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { adminService, notificationService } from "@/services/api";
+import { adminService, auditService, notificationService } from "@/services/api";
 import type {
   CreateAdminAccountInput,
 } from "@/types";
@@ -518,6 +518,20 @@ export function useCreateAdminSavingsGroup() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["admin", "savings-groups"] });
+    },
+  });
+}
+
+export function useAdminAuditLogs(enabled = true) {
+  return useQuery({
+    queryKey: ["admin", "audit-logs"],
+    enabled,
+    queryFn: async () => {
+      const response = await auditService.getLogs();
+      if (!response.success || !response.data) {
+        throw new Error(response.error || response.message || "Unable to load audit logs");
+      }
+      return response.data;
     },
   });
 }

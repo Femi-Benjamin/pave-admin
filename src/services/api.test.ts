@@ -115,4 +115,58 @@ describe("admin API response normalization", () => {
       data: { notifications: [{ id: "legacy-notification-1" }] },
     });
   });
+
+  it("coerces decimal-string savings group amounts to numbers", async () => {
+    const { adminService } = await loadServices();
+    respondWith([
+      { id: "g1", targetAmount: "500000.00", contributionAmount: "50000.00", currentBalance: "0.00" },
+    ]);
+
+    const response = await adminService.getSavingsGroups();
+
+    expect(response).toMatchObject({
+      success: true,
+      data: [{ targetAmount: 500000, contributionAmount: 50000, currentBalance: 0 }],
+    });
+  });
+
+  it("parses audit logs from a list or wrapped payload, newest first, with tolerant fields", async () => {
+    const { auditService } = await loadServices();
+    respondWith({
+      logs: [
+        { _id: "a", action: "block_user", email: "admin@x.com", createdAt: "2026-01-01T00:00:00.000Z" },
+        { id: "b", event: "login", user: { email: "root@x.com" }, message: "ok", timestamp: "2026-02-01T00:00:00.000Z" },
+      ],
+    });
+
+    const response = await auditService.getLogs();
+
+    expect(response.success).toBe(true);
+    expect(response.data?.map((l) => l.id)).toEqual(["b", "a"]);
+    expect(response.data?.[0]).toMatchObject({ action: "login", actor: "root@x.com", description: "ok" });
+  });
+
+  it("rejects an audit-logs response with no list", async () => {
+    const { auditService } = await loadServices();
+    respondWith({ nothing: true });
+    expect(await auditService.getLogs()).toMatchObject({ success: false });
+  });
+
+  it("posts the documented forgot/reset password payloads", async () => {
+    const { authService } = await loadServices();
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => "application/json" },
+      json: async () => ({ message: "done" }),
+    });
+
+    await authService.forgotPassword("a@b.com");
+    await authService.resetPassword("123456", "Str0ngPass!");
+
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.test/api/v1/auth/forgotPassword");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ email: "a@b.com" });
+    expect(fetchMock.mock.calls[1][0]).toBe("https://api.test/api/v1/auth/resetPassword");
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ token: "123456", password: "Str0ngPass!" });
+  });
 });

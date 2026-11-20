@@ -46,6 +46,7 @@ import {
   Building,
   AlertTriangle,
   Sparkles,
+  ScrollText,
 } from "lucide-react";
 import {
   AreaChart,
@@ -65,6 +66,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { useAuth } from "@/hooks/useAuth";
+import { AuditLogsSection } from "./AuditLogsSection";
 import {
   useAdminUserDetails,
   useAdminUserTransactions,
@@ -141,6 +143,7 @@ export type AdminSection =
   | "messaging"
   | "broadcast"
   | "reports"
+  | "audit-logs"
   | "settings"
   | "notifications";
 
@@ -232,8 +235,8 @@ function mapSavingsGroup(group: AdminSavingsGroup): SavingsProgram {
     name: group.name,
     type: group.frequency,
     members: group.currentMembers,
-    target: group.targetAmount,
-    collected: group.currentBalance,
+    target: Number(group.targetAmount) || 0,
+    collected: Number(group.currentBalance) || 0,
     started: group.startDate
       ? new Date(group.startDate).toLocaleDateString()
       : "Not available",
@@ -1062,11 +1065,13 @@ function MemberDetailSection({
   const m = { ...member, ...detailsQuery.data };
   const blocked = detailsQuery.data.isBlocked === true;
   const handleBlock = async () => {
+    const action = blocked ? "unblock" : "block";
+    if (!window.confirm(`Are you sure you want to ${action} ${m.email}?`)) return;
     try {
       const response = await blockUser.mutateAsync(m.email);
-      toast.success(response.statusMessage || "User blocked");
+      toast.success(response.statusMessage || (blocked ? "User unblocked" : "User blocked"));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to block user");
+      toast.error(error instanceof Error ? error.message : `Unable to ${action} user`);
     }
   };
 
@@ -1178,10 +1183,10 @@ function MemberDetailSection({
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={() => void handleBlock()}
-              disabled={blocked || blockUser.isPending}
+              disabled={blockUser.isPending}
               className="flex-1 py-2.5 bg-[#FEF2F2] text-[#DC2626] hover:bg-[#FEE2E2] dark:bg-[#EF4444]/20 dark:text-[#EF4444] rounded-xl text-sm font-semibold transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {blocked ? "User Blocked" : blockUser.isPending ? "Blocking..." : "Block Member"}
+              {blockUser.isPending ? "Updating..." : blocked ? "Unblock Member" : "Block Member"}
             </button>
           </div>
         </div>
@@ -2701,7 +2706,7 @@ function NotificationsSection() {
                     <div className="min-w-0">
                       <div className="mb-1 flex items-center gap-2">
                         <span className="text-sm font-semibold text-[#111827] dark:text-[#F0F2FF]">
-                          {notification.type.replaceAll("_", " ")}
+                          {notification.type.replace(/_/g, " ")}
                         </span>
                         {!notification.isRead && (
                           <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200">
@@ -3021,6 +3026,12 @@ const NAV_ITEMS = [
     path: "/dashboard/reports",
   },
   {
+    id: "audit-logs",
+    icon: ScrollText,
+    label: "Audit Logs",
+    path: "/dashboard/audit-logs",
+  },
+  {
     id: "settings",
     icon: Settings,
     label: "Settings",
@@ -3084,6 +3095,7 @@ export function AdminApp({
     if (path.includes("/marketplace")) return "marketplace";
     if (path.includes("/messaging")) return "messaging";
     if (path.includes("/reports")) return "reports";
+    if (path.includes("/audit-logs")) return "audit-logs";
     if (path.includes("/settings")) return "settings";
     if (path.includes("/notifications")) return "notifications";
     return "dashboard";
@@ -3331,6 +3343,8 @@ export function AdminApp({
         return <MessagingSection />;
       case "reports":
         return <ReportsSection />;
+      case "audit-logs":
+        return <AuditLogsSection />;
       case "settings":
         return <SettingsSection />;
       case "notifications":
