@@ -1212,6 +1212,7 @@ function KYCSection({
   } | null>(null);
   const [reason, setReason] = useState("");
   const [previewDoc, setPreviewDoc] = useState<string | null>(null);
+  const [cardDensity, setCardDensity] = useState<"compact" | "comfortable">("compact");
 
   const confirmAction = () => {
     if (!action) return;
@@ -1229,6 +1230,24 @@ function KYCSection({
       <PageHeader
         title="KYC Review"
         subtitle={`${queue.length} pending reviews`}
+        action={
+          <div className="flex items-center gap-2" aria-label="KYC card size">
+            <span className="text-xs text-[#6B7280] dark:text-[#94A3B8]">Card size</span>
+            <div className="inline-flex rounded-lg border border-[#E1E5EF] bg-white p-1 dark:border-white/10 dark:bg-[#111327]">
+              {(["compact", "comfortable"] as const).map((density) => (
+                <button
+                  key={density}
+                  type="button"
+                  aria-pressed={cardDensity === density}
+                  onClick={() => setCardDensity(density)}
+                  className={`rounded-md px-2.5 py-1.5 text-xs font-medium capitalize transition-colors ${cardDensity === density ? "bg-[#EEF2FF] text-[#3730A3] dark:bg-[#818CF8]/20 dark:text-[#818CF8]" : "text-[#6B7280] hover:bg-[#F9FAFB] dark:text-[#94A3B8] dark:hover:bg-white/5"}`}
+                >
+                  {density}
+                </button>
+              ))}
+            </div>
+          </div>
+        }
       />
       {isLoading ? (
         <div className="rounded-2xl border border-[#F1F3FB] bg-white p-8 text-center text-sm text-[#9CA3AF] shadow-sm dark:border-white/10 dark:bg-[#111327]">
@@ -1263,15 +1282,15 @@ function KYCSection({
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-4">
+        <div className={`max-h-[calc(100dvh-14rem)] min-h-[240px] overflow-y-auto overscroll-contain pr-1 scrollbar-hide grid items-start gap-2.5 ${cardDensity === "compact" ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"}`}>
           {queue.map((k) => (
             <div
               key={k.id}
-              className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm"
+              className={`bg-white dark:bg-[#111327] rounded-2xl ${cardDensity === "compact" ? "p-3 sm:p-4" : "p-5"} border border-[#F1F3FB] dark:border-white/10 shadow-sm`}
             >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-full bg-[#EEF2FF] dark:bg-[#818CF8]/20 flex items-center justify-center text-[#3730A3] dark:text-[#818CF8] font-bold">
+              <div className={`flex items-start justify-between ${cardDensity === "compact" ? "mb-2.5" : "mb-4"}`}>
+                <div className={`flex items-center ${cardDensity === "compact" ? "gap-2.5" : "gap-3"}`}>
+                  <div className={`${cardDensity === "compact" ? "h-9 w-9 text-sm" : "h-11 w-11"} rounded-full bg-[#EEF2FF] dark:bg-[#818CF8]/20 flex items-center justify-center text-[#3730A3] dark:text-[#818CF8] font-bold`}>
                     {k.name
                       .split(" ")
                       .map((n) => n[0])
@@ -1290,7 +1309,7 @@ function KYCSection({
                   {k.status}
                 </Badge>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              <div className={`grid grid-cols-1 sm:grid-cols-3 ${cardDensity === "compact" ? "gap-2 mb-2.5" : "gap-3 mb-4"}`}>
                 {[
                   ["NIN", k.nin],
                   ["ID Type", k.idType],
@@ -1298,7 +1317,7 @@ function KYCSection({
                 ].map(([l, v]) => (
                   <div
                     key={l}
-                    className="bg-[#F9FAFB] dark:bg-white/5 rounded-xl p-3"
+                    className={`bg-[#F9FAFB] dark:bg-white/5 rounded-xl ${cardDensity === "compact" ? "p-2" : "p-3"}`}
                   >
                     <div className="text-xs text-[#9CA3AF]">{l}</div>
                     <div className="text-sm font-semibold text-[#0D0F1C] dark:text-[#F0F2FF] mt-0.5">
@@ -1307,12 +1326,12 @@ function KYCSection({
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-                {["Document image"].map((doc) => (
+              <div className={`grid grid-cols-2 ${cardDensity === "compact" ? "gap-2 mb-2.5" : "gap-3 mb-4"}`}>
+                {["Front of ID", "Back of ID"].map((doc) => (
                   <div
                     key={doc}
                     onClick={() => setPreviewDoc(`${k.name} - ${doc}`)}
-                    className="aspect-[4/3] bg-[#F1F3FB] dark:bg-white/5 rounded-xl flex items-center justify-center cursor-pointer border border-dashed border-[#D1D5DB] dark:border-white/10"
+                    className={`${cardDensity === "compact" ? "h-24" : "h-32"} w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl flex items-center justify-center cursor-pointer border border-dashed border-[#D1D5DB] dark:border-white/10`}
                   >
                     <div className="text-center">
                       <Eye size={20} className="text-[#9CA3AF] mx-auto" />
@@ -1323,17 +1342,17 @@ function KYCSection({
                   </div>
                 ))}
               </div>
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className={`flex flex-col sm:flex-row ${cardDensity === "compact" ? "gap-2" : "gap-3"}`}>
                 <button
                   onClick={() => setAction({ id: k.id, type: "approve" })}
-                  className="flex-1 py-2.5 bg-[#ECFDF5] hover:bg-[#D1FAE5] text-[#059669] dark:bg-[#10B981]/20 dark:text-[#10B981] rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm"
+                  className={`flex-1 ${cardDensity === "compact" ? "py-2 text-xs" : "py-2.5 text-sm"} bg-[#ECFDF5] hover:bg-[#D1FAE5] text-[#059669] dark:bg-[#10B981]/20 dark:text-[#10B981] rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm`}
                 >
                   <CheckCircle size={16} />
                   Approve
                 </button>
                 <button
                   onClick={() => setAction({ id: k.id, type: "reject" })}
-                  className="flex-1 py-2.5 bg-[#FEF2F2] hover:bg-[#FEE2E2] text-[#DC2626] dark:bg-[#EF4444]/20 dark:text-[#EF4444] rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm"
+                  className={`flex-1 ${cardDensity === "compact" ? "py-2 text-xs" : "py-2.5 text-sm"} bg-[#FEF2F2] hover:bg-[#FEE2E2] text-[#DC2626] dark:bg-[#EF4444]/20 dark:text-[#EF4444] rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm`}
                 >
                   <XCircle size={16} />
                   Reject

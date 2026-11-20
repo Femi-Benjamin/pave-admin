@@ -355,6 +355,18 @@
 }
 
 @layer utilities {
+  /* Keep scrollable content usable while hiding scrollbar chrome throughout the app. */
+  *,
+  *::before,
+  *::after {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  *::-webkit-scrollbar {
+    display: none;
+  }
+
   .text-balance {
     text-wrap: balance;
   }
