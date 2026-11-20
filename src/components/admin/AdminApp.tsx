@@ -117,6 +117,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
+import { documentedAdminRolePolicy, hasAdminCapability } from "@/lib/admin-rbac";
 import type {
   AdminTransaction,
   AdminPendingKycUser,
@@ -2728,8 +2729,7 @@ function NotificationsSection() {
 
 function SettingsSection() {
   const { admin } = useAuth();
-  const canManageAdmins = admin?.role === "super_admin";
-  const rolesQuery = useAdminUserRoles(canManageAdmins);
+  const canManageAdmins = hasAdminCapability(admin?.role, "create_admin_account");
   const [adminForm, setAdminForm] = useState({
     firstName: "",
     lastName: "",
@@ -2738,7 +2738,6 @@ function SettingsSection() {
     address: "",
     city: "",
     state: "",
-    role: "admin" as "admin" | "superadmin",
   });
   const createAdminAccount = useCreateAdminAccount();
 
@@ -2768,7 +2767,6 @@ function SettingsSection() {
         address: "",
         city: "",
         state: "",
-        role: "admin",
       });
     } catch (error) {
       toast.error(
@@ -2787,8 +2785,8 @@ function SettingsSection() {
   return (
     <div>
       <PageHeader
-        title="Settings & Permissions"
-        subtitle="Configure platform and administrative access"
+        title="Settings & Access"
+        subtitle="View your account and the role capabilities documented for this Admin Hub"
       />
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
@@ -2849,7 +2847,7 @@ function SettingsSection() {
               Create Admin Account
             </h3>
             <p className="mb-4 text-sm text-[#9CA3AF]">
-              Add an administrator to the Pave platform.
+              Create an Admin account using the documented registration fields. The collection does not define role assignment in this request.
             </p>
             <form onSubmit={handleCreateAdmin} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {[
@@ -2878,20 +2876,6 @@ function SettingsSection() {
                   />
                 </label>
               ))}
-              <label>
-                <span className="mb-1 block text-xs font-medium text-[#374151] dark:text-gray-300">
-                  Role
-                </span>
-                <select
-                  name="role"
-                  value={adminForm.role}
-                  onChange={handleAdminFormChange}
-                  className="w-full rounded-xl border border-transparent bg-[#F1F3FB] px-4 py-3 text-sm text-[#0D0F1C] outline-none focus:border-[#3730A3] dark:bg-white/5 dark:text-[#F0F2FF]"
-                >
-                  <option value="admin">Admin</option>
-                  <option value="superadmin">Super Admin</option>
-                </select>
-              </label>
               <button
                 type="submit"
                 disabled={createAdminAccount.isPending}
@@ -2925,25 +2909,20 @@ function SettingsSection() {
               }}
               className="mb-4 text-[#0D0F1C] dark:text-[#F0F2FF]"
             >
-              Role Management
+              Documented Role Capabilities
             </h3>
-            {rolesQuery.isLoading ? (
-              <p className="py-3 text-sm text-[#9CA3AF]">Loading admin roles...</p>
-            ) : rolesQuery.isError ? (
-              <div className="py-3 text-sm text-red-600">
-                <p>{rolesQuery.error.message}</p>
-                <button onClick={() => void rolesQuery.refetch()} className="mt-2 font-semibold text-[#3730A3]">Retry</button>
-              </div>
-            ) : Array.from(new Set((rolesQuery.data ?? []).map((user) => user.role))).length === 0 ? (
-              <p className="py-3 text-sm text-[#9CA3AF]">No user roles found.</p>
-            ) : Array.from(new Set((rolesQuery.data ?? []).map((user) => user.role))).map((r) => (
+            <p className="mb-3 text-sm text-[#9CA3AF]">
+              These are frontend visibility rules based on documented API scope; backend enforcement has not been verified.
+            </p>
+            {documentedAdminRolePolicy.map(({ role, description }) => (
               <div
-                key={r}
+                key={role}
                 className="flex items-center justify-between py-2.5 border-b border-[#F9FAFB] dark:border-white/5 last:border-0"
               >
-                <span className="text-sm font-medium text-[#0D0F1C] dark:text-[#F0F2FF]">
-                  {r}
-                </span>
+                <div>
+                  <span className="text-sm font-medium text-[#0D0F1C] dark:text-[#F0F2FF]">{role}</span>
+                  <p className="mt-1 text-xs text-[#9CA3AF]">{description}</p>
+                </div>
                 <div className="flex gap-1.5">
                   <button disabled title="Role permissions are not available in the documented API" className="text-xs px-2.5 py-1 bg-[#EEF2FF] dark:bg-[#818CF8]/20 text-[#3730A3] dark:text-[#818CF8] rounded-lg font-medium opacity-50 cursor-not-allowed">
                     Permissions unavailable

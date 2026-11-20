@@ -21,7 +21,6 @@ export interface CreateAdminAccountInput {
   address: string;
   city: string;
   state: string;
-  role?: 'admin' | 'superadmin';
 }
 
 export interface CreateAdminAccountResponse {
