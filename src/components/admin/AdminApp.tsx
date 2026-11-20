@@ -757,7 +757,7 @@ function DashboardSection({
 }
 
 // ─── Members Section ──────────────────────────────────────────────────────────
-type RegistrationPeriod = "today" | "7days" | "month" | "all";
+type RegistrationPeriod = "today" | "yesterday" | "3days" | "7days" | "week" | "month" | "all";
 
 function MembersSection({
   members,
@@ -784,8 +784,17 @@ function MembersSection({
   const now = new Date();
   const periodStart = new Date(now);
   periodStart.setHours(0, 0, 0, 0);
-  if (registrationPeriod === "7days") {
+  const periodEnd = new Date(now);
+  if (registrationPeriod === "yesterday") {
+    periodEnd.setHours(0, 0, 0, 0);
+    periodStart.setDate(periodStart.getDate() - 1);
+  } else if (registrationPeriod === "3days") {
+    periodStart.setDate(periodStart.getDate() - 2);
+  } else if (registrationPeriod === "7days") {
     periodStart.setDate(periodStart.getDate() - 6);
+  } else if (registrationPeriod === "week") {
+    const daysSinceMonday = (periodStart.getDay() + 6) % 7;
+    periodStart.setDate(periodStart.getDate() - daysSinceMonday);
   } else if (registrationPeriod === "month") {
     periodStart.setDate(1);
   }
@@ -797,7 +806,7 @@ function MembersSection({
     if (registrationPeriod === "all") return true;
     if (!member.createdAt || !Number.isFinite(new Date(member.createdAt).getTime())) return false;
     const createdAt = new Date(member.createdAt);
-    return createdAt <= now && createdAt >= periodStart;
+    return createdAt >= periodStart && createdAt < periodEnd;
   };
   const registrationCount =
     members.length > 0 && datedMembers.length === 0
@@ -805,7 +814,10 @@ function MembersSection({
       : datedMembers.filter(matchesRegistrationPeriod).length;
   const registrationPeriodLabel = {
     today: "Today",
+    yesterday: "Yesterday",
+    "3days": "Last 3 days",
     "7days": "Last 7 days",
+    week: "This week",
     month: "This month",
     all: "All time",
   }[registrationPeriod];
@@ -864,7 +876,10 @@ function MembersSection({
             </SelectTrigger>
             <SelectContent position="popper" className="rounded-xl">
               <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="yesterday">Yesterday</SelectItem>
+              <SelectItem value="3days">Last 3 days</SelectItem>
               <SelectItem value="7days">Last 7 days</SelectItem>
+              <SelectItem value="week">This week</SelectItem>
               <SelectItem value="month">This month</SelectItem>
               <SelectItem value="all">All time</SelectItem>
             </SelectContent>
