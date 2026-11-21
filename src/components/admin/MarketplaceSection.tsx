@@ -11,7 +11,7 @@ import {
 
 const naira = (n: number) => `₦${n.toLocaleString()}`;
 const card =
-  "rounded-2xl border border-[#F1F3FB] bg-white shadow-sm dark:border-white/10 dark:bg-[#111327]";
+  "rounded-2xl border border-line bg-white shadow-sm dark:border-white/10 dark:bg-[#111327]";
 const field =
   "mt-1.5 w-full rounded-xl bg-[#F1F3FB] px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#3730A3] dark:bg-white/5";
 
@@ -33,7 +33,7 @@ function QueryNotice({
   onRetry: () => void;
 }) {
   if (isLoading) {
-    return <p className="p-10 text-center text-sm text-[#9CA3AF]">Loading {label}...</p>;
+    return <p className="p-10 text-center text-sm text-ink-muted">Loading {label}...</p>;
   }
   if (isError) {
     return (
@@ -46,7 +46,7 @@ function QueryNotice({
     );
   }
   if (empty) {
-    return <p className="p-10 text-center text-sm text-[#9CA3AF]">No {label} found.</p>;
+    return <p className="p-10 text-center text-sm text-ink-muted">No {label} found.</p>;
   }
   return null;
 }
@@ -163,7 +163,7 @@ function ProductForm({ onClose }: { onClose: () => void }) {
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border-2 border-[#E5E7EB] px-5 py-2.5 text-sm"
+              className="rounded-xl border-2 border-[#C9CEDF] px-5 py-2.5 text-sm"
             >
               Cancel
             </button>
@@ -213,7 +213,7 @@ export function MarketplaceSection() {
     }
   };
 
-  const th = "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#9CA3AF]";
+  const th = "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-ink-muted";
   const td = "px-4 py-3 text-sm";
 
   return (
@@ -221,7 +221,7 @@ export function MarketplaceSection() {
       <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold text-[#0D0F1C] dark:text-[#F0F2FF]">Marketplace</h1>
-          <p className="mt-1 text-sm text-[#6B7280] dark:text-[#94A3B8]">
+          <p className="mt-1 text-sm text-ink-muted dark:text-[#94A3B8]">
             Manage products and view installment purchases
           </p>
         </div>
@@ -248,7 +248,7 @@ export function MarketplaceSection() {
               className={`rounded-xl px-4 py-2 text-sm font-semibold capitalize ${
                 tab === item
                   ? "bg-[#3730A3] text-white"
-                  : "bg-white text-[#6B7280] ring-1 ring-[#E5E7EB] dark:bg-[#111327] dark:ring-white/10"
+                  : "bg-white text-ink-muted ring-1 ring-[#E5E7EB] dark:bg-[#111327] dark:ring-white/10"
               }`}
             >
               {item}
@@ -256,7 +256,7 @@ export function MarketplaceSection() {
           ))}
         </div>
         <div className="relative w-full max-w-xs">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -291,10 +291,10 @@ export function MarketplaceSection() {
                   </thead>
                   <tbody>
                     {productRows.map((p) => (
-                      <tr key={p.id} className="border-t border-[#F1F3FB] dark:border-white/10">
+                      <tr key={p.id} className="border-t border-line dark:border-white/10">
                         <td className={td}>
                           <div className="font-semibold">{p.name}</div>
-                          <div className="max-w-xs truncate text-xs text-[#9CA3AF]">{p.description}</div>
+                          <div className="max-w-xs truncate text-xs text-ink-muted">{p.description}</div>
                         </td>
                         <td className={td}>{categoryName.get(p.categoryId) ?? "—"}</td>
                         <td className={td}>{naira(p.price)}</td>
@@ -342,11 +342,11 @@ export function MarketplaceSection() {
                   </thead>
                   <tbody>
                     {purchaseRows.map((p) => (
-                      <tr key={p.id} className="border-t border-[#F1F3FB] dark:border-white/10">
+                      <tr key={p.id} className="border-t border-line dark:border-white/10">
                         <td className={`${td} font-semibold`}>{p.productName}</td>
                         <td className={td}>
                           <div>{p.buyerName}</div>
-                          <div className="text-xs text-[#9CA3AF]">{p.buyerEmail}</div>
+                          <div className="text-xs text-ink-muted">{p.buyerEmail}</div>
                         </td>
                         <td className={td}>{p.quantity}</td>
                         <td className={td}>{naira(p.totalPrice)}</td>

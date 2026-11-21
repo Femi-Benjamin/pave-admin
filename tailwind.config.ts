@@ -15,11 +15,21 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Inter', 'DM Sans', 'system-ui', 'sans-serif'],
-        display: ['DM Sans', 'Inter', 'system-ui', 'sans-serif'],
+        sans: ['DM Sans', 'system-ui', 'sans-serif'],
+        display: ['Bricolage Grotesque', 'DM Sans', 'system-ui', 'sans-serif'],
+        mono: ['DM Mono', 'ui-monospace', 'monospace'],
       },
       colors: {
         border: "hsl(var(--border))",
+        line: "hsl(var(--line))",
+        ink: {
+          muted: "hsl(var(--ink-muted))",
+          primary: "hsl(var(--ink-primary))",
+          success: "hsl(var(--ink-success))",
+          warning: "hsl(var(--ink-warning))",
+          danger: "hsl(var(--ink-danger))",
+          purple: "hsl(var(--ink-purple))",
+        },
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
@@ -102,6 +112,7 @@ export default {
       boxShadow: {
         'card': 'var(--shadow-card)',
         'card-hover': 'var(--shadow-card-hover)',
+        'pop': 'var(--shadow-lg)',
       },
       keyframes: {
         "accordion-down": {

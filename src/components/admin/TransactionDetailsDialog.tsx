@@ -65,7 +65,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
           toast.error("Unable to copy");
         }
       }}
-      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[#6B7280] transition-colors hover:bg-[#EEF2FF] hover:text-[#3730A3] dark:text-[#94A3B8] dark:hover:bg-white/10"
+      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-[#EEF2FF] hover:text-ink-primary dark:text-[#94A3B8] dark:hover:bg-white/10"
     >
       {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
     </button>
@@ -75,8 +75,8 @@ function CopyButton({ value, label }: { value: string; label: string }) {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
-      <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[#9CA3AF]">{title}</h3>
-      <div className="divide-y divide-[#F1F3FB] rounded-2xl border border-[#F1F3FB] bg-white px-4 dark:divide-white/10 dark:border-white/10 dark:bg-white/[0.03]">
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-muted">{title}</h3>
+      <div className="divide-y divide-line rounded-2xl border border-line bg-white px-4 dark:divide-white/10 dark:border-white/10 dark:bg-white/[0.03]">
         {children}
       </div>
     </section>
@@ -98,7 +98,7 @@ function Row({
 }) {
   return (
     <div className="flex items-start justify-between gap-4 py-3 text-sm">
-      <dt className="shrink-0 text-[#6B7280] dark:text-[#94A3B8]">{label}</dt>
+      <dt className="shrink-0 text-ink-muted dark:text-[#94A3B8]">{label}</dt>
       <dd
         className={`flex min-w-0 items-center gap-1 text-right text-[#0D0F1C] dark:text-[#F0F2FF] ${
           strong ? "font-semibold" : "font-medium"
@@ -202,8 +202,8 @@ export function TransactionDetailsDialog({
       >
         {t && (
           <>
-            <header className="shrink-0 border-b border-[#F1F3FB] px-6 pb-5 pt-6 pr-12 dark:border-white/10">
-              <DialogTitle className="text-xs font-semibold uppercase tracking-wider text-[#9CA3AF]">
+            <header className="shrink-0 border-b border-line px-6 pb-5 pt-6 pr-12 dark:border-white/10">
+              <DialogTitle className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
                 Transaction details
               </DialogTitle>
               <DialogDescription className="sr-only">
@@ -217,7 +217,7 @@ export function TransactionDetailsDialog({
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
                 <StatusPill status={t.status} />
-                <span className="text-xs text-[#6B7280] dark:text-[#94A3B8]">
+                <span className="text-xs text-ink-muted dark:text-[#94A3B8]">
                   {dateTime(t.createdAt) ?? ""}
                 </span>
               </div>
@@ -228,7 +228,7 @@ export function TransactionDetailsDialog({
 
             <div className="admin-dialog-scrollbar min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain bg-[#F9FAFB] px-6 py-5 dark:bg-[#0D0F20]">
               {isRefreshing && (
-                <p className="text-xs text-[#9CA3AF]">Refreshing latest details…</p>
+                <p className="text-xs text-ink-muted">Refreshing latest details…</p>
               )}
               {error && (
                 <div
@@ -276,7 +276,7 @@ export function TransactionDetailsDialog({
 
               <Section title="Customer">
                 <div className="flex items-center gap-3 py-3.5">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#EEF2FF] text-sm font-bold text-[#3730A3] dark:bg-[#818CF8]/20 dark:text-[#818CF8]">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#EEF2FF] text-sm font-bold text-ink-primary dark:bg-[#818CF8]/20 dark:text-[#818CF8]">
                     {initials}
                   </div>
                   <div className="min-w-0">
@@ -284,7 +284,7 @@ export function TransactionDetailsDialog({
                       {userName}
                     </div>
                     {userEmail && (
-                      <div className="truncate text-xs text-[#6B7280] dark:text-[#94A3B8]">{userEmail}</div>
+                      <div className="truncate text-xs text-ink-muted dark:text-[#94A3B8]">{userEmail}</div>
                     )}
                   </div>
                 </div>
@@ -317,10 +317,10 @@ export function TransactionDetailsDialog({
               </Section>
 
               <Collapsible open={showAll} onOpenChange={setShowAll}>
-                <CollapsibleTrigger className="group flex w-full items-center justify-between rounded-2xl border border-[#E5E7EB] bg-white px-4 py-3 text-sm font-semibold text-[#3730A3] transition-colors hover:bg-[#F5F6FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3730A3] dark:border-white/10 dark:bg-white/[0.03] dark:text-[#818CF8] dark:hover:bg-white/5">
+                <CollapsibleTrigger className="group flex w-full items-center justify-between rounded-2xl border border-[#C9CEDF] bg-white px-4 py-3 text-sm font-semibold text-ink-primary transition-colors hover:bg-[#F5F6FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3730A3] dark:border-white/10 dark:bg-white/[0.03] dark:text-[#818CF8] dark:hover:bg-white/5">
                   <span>
                     {showAll ? "Hide all details" : "View all details"}
-                    <span className="ml-2 text-xs font-medium text-[#9CA3AF]">
+                    <span className="ml-2 text-xs font-medium text-ink-muted">
                       {allFields.length} fields
                     </span>
                   </span>
@@ -334,15 +334,15 @@ export function TransactionDetailsDialog({
                     {allFields.map(([label, value, mono]) => (
                       <div
                         key={label}
-                        className="min-w-0 rounded-xl border border-[#F1F3FB] bg-white px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.03]"
+                        className="min-w-0 rounded-xl border border-line bg-white px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.03]"
                       >
-                        <dt className="text-[11px] font-medium text-[#9CA3AF]">{label}</dt>
+                        <dt className="text-xs font-medium text-ink-muted">{label}</dt>
                         <dd
                           className={`mt-0.5 break-all text-sm font-medium text-[#0D0F1C] dark:text-[#F0F2FF] ${
                             mono ? "font-mono text-xs" : ""
                           }`}
                         >
-                          {present(value) ? String(value) : <span className="text-[#9CA3AF]">—</span>}
+                          {present(value) ? String(value) : <span className="text-ink-muted">—</span>}
                         </dd>
                       </div>
                     ))}

@@ -31,10 +31,10 @@ export default function Login() {
     <div className="min-h-screen flex">
       <div className="hidden lg:flex lg:w-1/2 gradient-hero items-center justify-center p-12">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="text-center">
-          <img src="/pave_logo.png" alt="PAVE Admin Hub" className="mx-auto mb-8 h-16 w-16 rounded-2xl" />
+          <img src="/pave_logo.png" alt="PAVE Admin Hub" className="mx-auto mb-8 h-20 w-20 rounded-2xl bg-white p-3 shadow-xl" />
           <h1 className="mb-4 text-5xl font-bold text-white font-display">PAVE Admin Hub</h1>
-          <p className="max-w-md text-xl text-white/80">Digital Wallet, Savings & Thrift Platform</p>
-          <div className="mt-12 grid grid-cols-3 gap-6 text-white/70">
+          <p className="max-w-md text-xl text-white/90">Digital Wallet, Savings & Thrift Platform</p>
+          <div className="mt-12 grid grid-cols-3 gap-6 text-white/90">
             <div><div className="text-3xl font-bold text-white">10K+</div><div className="text-sm">Active Users</div></div>
             <div><div className="text-3xl font-bold text-white">₦5M+</div><div className="text-sm">Transactions</div></div>
             <div><div className="text-3xl font-bold text-white">99.9%</div><div className="text-sm">Uptime</div></div>
@@ -55,19 +55,19 @@ export default function Login() {
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="email">Email address</Label>
-              <Input id="email" type="email" placeholder="arowolo@yopmail" value={email} onChange={(event) => setEmail(event.target.value)} className="h-12" required autoComplete="email" />
+              <Input id="email" type="email" placeholder="you@company.com" value={email} onChange={(event) => setEmail(event.target.value)} className="h-12" required autoComplete="email" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
-                <Input id="password" type={showPassword ? "text" : "password"} placeholder="admin198177" value={password} onChange={(event) => setPassword(event.target.value)} className="h-12 pr-12" required autoComplete="current-password" />
+                <Input id="password" type={showPassword ? "text" : "password"} placeholder="Enter your password" value={password} onChange={(event) => setPassword(event.target.value)} className="h-12 pr-12" required autoComplete="current-password" />
                 <button type="button" onClick={() => setShowPassword((current) => !current)} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label={showPassword ? "Hide password" : "Show password"}>
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
             </div>
             <div className="flex justify-end">
-              <Link to="/forgot-password" className="text-sm text-primary hover:text-primary/80">Forgot password?</Link>
+              <Link to="/forgot-password" className="text-sm font-medium text-primary underline-offset-4 hover:underline">Forgot password?</Link>
             </div>
             <Button type="submit" className="h-12 w-full text-base gradient-hero hover:opacity-90" disabled={isLoading}>
               {isLoading ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Signing in...</> : "Sign in"}

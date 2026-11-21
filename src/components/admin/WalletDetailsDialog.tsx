@@ -66,8 +66,8 @@ export function WalletDetailsDialog({
       <DialogContent onOpenAutoFocus={(e) => e.preventDefault()} className="flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-3xl border-white/10 bg-white p-0 dark:bg-[#111327]">
         {member && (
           <>
-            <div className="flex shrink-0 items-center gap-3 border-b border-[#F1F3FB] p-6 pr-12 dark:border-white/10">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EEF2FF] text-lg font-bold text-[#3730A3] dark:bg-[#818CF8]/20 dark:text-[#818CF8]">
+            <div className="flex shrink-0 items-center gap-3 border-b border-line p-6 pr-12 dark:border-white/10">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EEF2FF] text-lg font-bold text-ink-primary dark:bg-[#818CF8]/20 dark:text-[#818CF8]">
                 {initials}
               </div>
               <div className="min-w-0">
@@ -77,7 +77,7 @@ export function WalletDetailsDialog({
                 >
                   {name}
                 </DialogTitle>
-                <DialogDescription className="truncate text-xs text-[#9CA3AF]">
+                <DialogDescription className="truncate text-xs text-ink-muted">
                   {[d?.email || member.email, d?.phone || member.phone].filter(Boolean).join(" · ")}
                 </DialogDescription>
               </div>
@@ -87,7 +87,7 @@ export function WalletDetailsDialog({
               <div className="mb-6 rounded-2xl bg-gradient-to-r from-[#1E1B4B] to-[#3730A3] p-5 text-white shadow-lg">
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div>
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-white/70">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-white/70">
                       Virtual NGN Account
                     </span>
                     <div className="mt-0.5 text-2xl font-bold tracking-tight">
@@ -104,23 +104,23 @@ export function WalletDetailsDialog({
                 </div>
                 <div className="grid grid-cols-2 gap-3 border-t border-white/15 pt-3 text-xs sm:grid-cols-3">
                   <div>
-                    <div className="text-[11px] text-white/60">Account Number</div>
+                    <div className="text-xs text-white/60">Account Number</div>
                     <div className="font-semibold tracking-wider">
                       {d?.accountNumber || member.accountNumber || "Not provided"}
                     </div>
                   </div>
                   <div>
-                    <div className="text-[11px] text-white/60">Account Name</div>
+                    <div className="text-xs text-white/60">Account Name</div>
                     <div className="truncate font-semibold">{d?.accountName || "Not provided"}</div>
                   </div>
                   <div>
-                    <div className="text-[11px] text-white/60">Account Tier</div>
+                    <div className="text-xs text-white/60">Account Tier</div>
                     <div className="font-semibold">{member.tier || "Tier 3 - Verified"}</div>
                   </div>
                 </div>
               </div>
 
-              {details.isLoading && <p className="mb-4 text-sm text-[#9CA3AF]">Loading user details…</p>}
+              {details.isLoading && <p className="mb-4 text-sm text-ink-muted">Loading user details…</p>}
               {details.isError && (
                 <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
                   {errMsg(details.error, "Unable to load user details")}
@@ -134,20 +134,20 @@ export function WalletDetailsDialog({
                 <>
                   <div className="mb-5 grid grid-cols-1 gap-3 rounded-2xl bg-[#F9FAFB] p-4 text-sm dark:bg-white/5 sm:grid-cols-2">
                     <div className="sm:col-span-2">
-                      <div className="text-xs text-[#9CA3AF]">Address</div>
+                      <div className="text-xs text-ink-muted">Address</div>
                       <div className="mt-1 font-medium text-[#374151] dark:text-gray-200">{d.address || "Not provided"}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-[#9CA3AF]">Signed up</div>
+                      <div className="text-xs text-ink-muted">Signed up</div>
                       <div className="mt-1 font-medium text-[#374151] dark:text-gray-200">{when(d.signUpOn)}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-[#9CA3AF]">Last login</div>
+                      <div className="text-xs text-ink-muted">Last login</div>
                       <div className="mt-1 font-medium text-[#374151] dark:text-gray-200">{when(d.lastLogin, true)}</div>
                     </div>
                   </div>
-                  <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-[#F1F3FB] p-3 dark:border-white/10">
-                    <p className="text-sm text-[#6B7280] dark:text-[#94A3B8]">
+                  <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-line p-3 dark:border-white/10">
+                    <p className="text-sm text-ink-muted dark:text-[#94A3B8]">
                       {blocked ? "This user is blocked and cannot sign in." : "This user is active."}
                     </p>
                     <button
@@ -168,11 +168,11 @@ export function WalletDetailsDialog({
                   <h3 className="text-sm font-bold text-[#0D0F1C] dark:text-[#F0F2FF]" style={{ fontFamily: "var(--font-family-display)" }}>
                     Recent Ledger Activity
                   </h3>
-                  <span className="text-xs text-[#9CA3AF]">{transactions.data?.length ?? 0} transactions</span>
+                  <span className="text-xs text-ink-muted">{transactions.data?.length ?? 0} transactions</span>
                 </div>
                 <div className="admin-dialog-scrollbar max-h-[19rem] space-y-2 overflow-y-auto overscroll-contain pr-1">
                   {transactions.isLoading ? (
-                    <p className="py-4 text-center text-sm text-[#9CA3AF]">Loading user transactions…</p>
+                    <p className="py-4 text-center text-sm text-ink-muted">Loading user transactions…</p>
                   ) : transactions.isError ? (
                     <div role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">
                       {errMsg(transactions.error, "Unable to load user transactions")}
@@ -186,27 +186,27 @@ export function WalletDetailsDialog({
                       return (
                         <div key={tx._id || tx.reference} className="flex items-center justify-between rounded-xl bg-[#F9FAFB] p-3 text-xs dark:bg-white/5">
                           <div className="flex min-w-0 items-center gap-3">
-                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${credit ? "bg-[#ECFDF5] text-[#059669]" : "bg-[#FEF2F2] text-[#DC2626]"}`}>
+                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${credit ? "bg-[#ECFDF5] text-[#047857]" : "bg-[#FEF2F2] text-[#B91C1C]"}`}>
                               {credit ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
                             </div>
                             <div className="min-w-0">
                               <div className="truncate font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
                                 {tx.description || tx.type || "Transaction"}
                               </div>
-                              <div className="truncate text-[10px] text-[#9CA3AF]">
+                              <div className="truncate text-[11px] text-ink-muted">
                                 {when(tx.createdAt, true)} · {tx.reference}
                               </div>
-                              <div className="text-[10px] text-[#9CA3AF]">Status: {tx.status}</div>
+                              <div className="text-[11px] text-ink-muted">Status: {tx.status}</div>
                             </div>
                           </div>
-                          <div className={`ml-3 shrink-0 font-bold ${credit ? "text-[#059669]" : "text-[#DC2626]"}`}>
+                          <div className={`ml-3 shrink-0 font-bold ${credit ? "text-ink-success" : "text-ink-danger"}`}>
                             {naira(tx.amount)}
                           </div>
                         </div>
                       );
                     })
                   ) : (
-                    <p className="py-4 text-center text-sm text-[#9CA3AF]">No transactions found for this user.</p>
+                    <p className="py-4 text-center text-sm text-ink-muted">No transactions found for this user.</p>
                   )}
                 </div>
               </div>

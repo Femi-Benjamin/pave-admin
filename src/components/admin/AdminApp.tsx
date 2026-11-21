@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, animate, useReducedMotion } from "framer-motion";
 import {
   LayoutDashboard,
   Users,
@@ -267,14 +267,84 @@ const fmt = (n: number) => `₦${n.toLocaleString()}`;
 const pct = (a: number, b: number) => Math.min(100, Math.round((a / b) * 100));
 
 // ─── Shared UI Components ────────────────────────────────────────────────────
+const STAT_TONES: Record<string, { icon: string; ring: string }> = {
+  primary: {
+    icon: "bg-[#EEF2FF] text-ink-primary dark:bg-[#818CF8]/15",
+    ring: "group-hover:ring-[#3730A3]/15 dark:group-hover:ring-[#818CF8]/25",
+  },
+  success: {
+    icon: "bg-[#ECFDF5] text-ink-success dark:bg-[#10B981]/15",
+    ring: "group-hover:ring-[#059669]/15 dark:group-hover:ring-[#10B981]/25",
+  },
+  warning: {
+    icon: "bg-[#FFFBEB] text-ink-warning dark:bg-[#FBBF24]/15",
+    ring: "group-hover:ring-[#D97706]/15 dark:group-hover:ring-[#FBBF24]/25",
+  },
+  danger: {
+    icon: "bg-[#FEF2F2] text-ink-danger dark:bg-[#EF4444]/15",
+    ring: "group-hover:ring-[#DC2626]/15 dark:group-hover:ring-[#EF4444]/25",
+  },
+  purple: {
+    icon: "bg-[#F5F3FF] text-ink-purple dark:bg-[#A78BFA]/15",
+    ring: "group-hover:ring-[#7C3AED]/15 dark:group-hover:ring-[#A78BFA]/25",
+  },
+};
+
+// Existing call sites pass a hex `color`; map it onto a theme-aware tone.
+const toneFromColor = (color?: string) => {
+  switch ((color ?? "").toUpperCase()) {
+    case "#059669": return "success";
+    case "#D97706": return "warning";
+    case "#DC2626": return "danger";
+    case "#7C3AED": return "purple";
+    default: return "primary";
+  }
+};
+
+// Counts a leading number up from 0 (e.g. "₦1,250,000" or "3,420"). Anything
+// else ("...", "Unavailable", "92%") renders untouched.
+function AnimatedValue({ value }: { value: string }) {
+  const reduceMotion = useReducedMotion();
+  const match = /^(₦?)(\d[\d,]*(?:\.\d+)?)(.*)$/.exec(value);
+  const target = match ? Number(match[2].replace(/,/g, "")) : NaN;
+  const [shown, setShown] = useState<number>(reduceMotion ? target : 0);
+
+  useEffect(() => {
+    if (!match || Number.isNaN(target)) return;
+    if (reduceMotion || target === 0) {
+      setShown(target);
+      return;
+    }
+    const controls = animate(0, target, {
+      duration: 0.9,
+      ease: [0.22, 1, 0.36, 1],
+      onUpdate: (v) => setShown(v),
+    });
+    return () => controls.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, reduceMotion]);
+
+  if (!match || Number.isNaN(target)) return <>{value}</>;
+  const decimals = match[2].includes(".") ? match[2].split(".")[1].length : 0;
+  return (
+    <>
+      {match[1]}
+      {shown.toLocaleString(undefined, {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      })}
+      {match[3]}
+    </>
+  );
+}
+
 function StatCard({
   label,
   value,
   sub,
   icon,
   trend,
-  color = "#3730A3",
-  bg = "#EEF2FF",
+  color,
 }: {
   label: string;
   value: string;
@@ -284,18 +354,22 @@ function StatCard({
   color?: string;
   bg?: string;
 }) {
+  const tone = STAT_TONES[toneFromColor(color)];
   return (
-    <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm transition-all hover:shadow-md">
-      <div className="flex items-start justify-between mb-4">
+    <div className="group rounded-2xl border border-line bg-white p-5 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover dark:border-white/10 dark:bg-[#111327]">
+      <div className="mb-4 flex items-start justify-between">
         <div
-          className="w-11 h-11 rounded-xl flex items-center justify-center"
-          style={{ background: bg, color }}
+          className={`flex h-11 w-11 items-center justify-center rounded-xl ring-4 ring-transparent transition-all duration-200 group-hover:scale-105 ${tone.icon} ${tone.ring}`}
         >
           {icon}
         </div>
         {trend !== undefined && (
           <div
-            className={`flex items-center gap-1 text-xs font-semibold ${trend > 0 ? "text-[#059669]" : "text-[#DC2626]"}`}
+            className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
+              trend > 0
+                ? "bg-[#ECFDF5] text-ink-success dark:bg-[#10B981]/15"
+                : "bg-[#FEF2F2] text-ink-danger dark:bg-[#EF4444]/15"
+            }`}
           >
             {trend > 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
             {Math.abs(trend)}%
@@ -303,24 +377,29 @@ function StatCard({
         )}
       </div>
       <div
-        className="text-2xl font-bold text-[#0D0F1C] dark:text-[#F0F2FF]"
+        className="tabular text-2xl font-bold tracking-tight text-[#0D0F1C] dark:text-[#F0F2FF]"
         style={{
           fontFamily: "var(--font-family-display, 'Bricolage Grotesque')",
         }}
       >
-        {value}
+        <AnimatedValue value={value} />
       </div>
-      <div className="text-sm font-medium text-[#374151] dark:text-[#94A3B8] mt-0.5">
+      <div className="mt-0.5 text-sm font-medium text-[#374151] dark:text-[#CBD5E1]">
         {label}
       </div>
-      {sub && (
-        <div className="text-xs text-[#9CA3AF] dark:text-gray-400 mt-1">
-          {sub}
-        </div>
-      )}
+      {sub && <div className="mt-1 text-xs text-ink-muted">{sub}</div>}
     </div>
   );
 }
+
+const chartTooltipStyle: React.CSSProperties = {
+  borderRadius: 12,
+  border: "1px solid hsl(var(--line))",
+  background: "hsl(var(--card))",
+  color: "hsl(var(--foreground))",
+  boxShadow: "var(--shadow-lg)",
+  fontSize: 12,
+};
 
 function QueryErrorNotice({
   error,
@@ -350,20 +429,21 @@ function Badge({
   children: React.ReactNode;
   color?: string;
 }) {
+  // Light: text >= 4.8:1 on its tint. Dark: pastel text on translucent tint.
   const colors: Record<string, string> = {
     indigo:
-      "bg-[#EEF2FF] text-[#3730A3] dark:bg-[#818CF8]/20 dark:text-[#818CF8]",
+      "bg-[#EEF2FF] text-[#3730A3] ring-[#3730A3]/10 dark:bg-[#818CF8]/15 dark:text-[#A5B4FC] dark:ring-[#818CF8]/25",
     green:
-      "bg-[#ECFDF5] text-[#059669] dark:bg-[#10B981]/20 dark:text-[#10B981]",
-    gold: "bg-[#FFFBEB] text-[#D97706] dark:bg-[#FBBF24]/20 dark:text-[#FBBF24]",
-    red: "bg-[#FEF2F2] text-[#DC2626] dark:bg-[#EF4444]/20 dark:text-[#EF4444]",
-    gray: "bg-[#F3F4F6] text-[#6B7280] dark:bg-white/10 dark:text-gray-300",
+      "bg-[#ECFDF5] text-[#047857] ring-[#047857]/10 dark:bg-[#10B981]/15 dark:text-[#6EE7B7] dark:ring-[#10B981]/25",
+    gold: "bg-[#FFFBEB] text-[#B45309] ring-[#B45309]/10 dark:bg-[#FBBF24]/15 dark:text-[#FCD34D] dark:ring-[#FBBF24]/25",
+    red: "bg-[#FEF2F2] text-[#B91C1C] ring-[#B91C1C]/10 dark:bg-[#EF4444]/15 dark:text-[#FCA5A5] dark:ring-[#EF4444]/25",
+    gray: "bg-[#F3F4F6] text-[#4B5563] ring-[#4B5563]/10 dark:bg-white/10 dark:text-gray-200 dark:ring-white/15",
     purple:
-      "bg-[#F5F3FF] text-[#7C3AED] dark:bg-[#A78BFA]/20 dark:text-[#A78BFA]",
+      "bg-[#F5F3FF] text-[#6D28D9] ring-[#6D28D9]/10 dark:bg-[#A78BFA]/15 dark:text-[#C4B5FD] dark:ring-[#A78BFA]/25",
   };
   return (
     <span
-      className={`px-2.5 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1 ${colors[color] || colors.indigo}`}
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${colors[color] || colors.indigo}`}
     >
       {children}
     </span>
@@ -391,7 +471,7 @@ function PageHeader({
           {title}
         </h1>
         {subtitle && (
-          <p className="text-[#6B7280] dark:text-[#94A3B8] text-sm mt-1">
+          <p className="text-ink-muted dark:text-[#94A3B8] text-sm mt-1">
             {subtitle}
           </p>
         )}
@@ -428,7 +508,7 @@ function DashboardSection({
     .slice(0, 5);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="stagger flex flex-col gap-6">
       <PageHeader
         title="Dashboard"
         subtitle="Platform overview"
@@ -448,7 +528,7 @@ function DashboardSection({
         }
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="stagger grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           label="Total Members"
           value={membersQuery.isLoading ? "..." : members === undefined ? "Unavailable" : members.toLocaleString()}
@@ -506,7 +586,7 @@ function DashboardSection({
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="xl:col-span-2 bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
+        <div className="xl:col-span-2 bg-white dark:bg-[#111327] rounded-2xl p-5 border border-line dark:border-white/10 shadow-card">
           <div className="flex items-center justify-between mb-4">
             <h3
               style={{
@@ -521,21 +601,21 @@ function DashboardSection({
             <Badge color="indigo">Monthly</Badge>
           </div>
             {revenueQuery.isLoading ? (
-              <div className="flex h-[220px] items-center justify-center text-sm text-[#9CA3AF]">Loading revenue overview...</div>
+              <div className="flex h-[220px] items-center justify-center text-sm text-ink-muted">Loading revenue overview...</div>
             ) : revenueQuery.isError ? (
             <div className="flex h-[220px] flex-col items-center justify-center gap-3 text-sm text-red-600">
                 <span>{revenueQuery.error.message}</span>
-                <button onClick={() => void revenueQuery.refetch()} className="font-semibold text-[#3730A3]">Retry</button>
+                <button onClick={() => void revenueQuery.refetch()} className="font-semibold text-ink-primary">Retry</button>
             </div>
             ) : revenueData.length === 0 ? (
-              <div className="flex h-[220px] items-center justify-center text-sm text-[#9CA3AF]">No revenue overview data found.</div>
+              <div className="flex h-[220px] items-center justify-center text-sm text-ink-muted">No revenue overview data found.</div>
           ) : (
           <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={revenueData}>
               <defs>
                 <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3730A3" stopOpacity={0.25} />
-                  <stop offset="95%" stopColor="#3730A3" stopOpacity={0} />
+                  <stop offset="5%" stopColor="hsl(var(--ink-primary))" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="hsl(var(--ink-primary))" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis
@@ -546,12 +626,12 @@ function DashboardSection({
                     ? value
                     : date.toLocaleDateString(undefined, { month: "short", year: "2-digit" });
                 }}
-                tick={{ fontSize: 11, fill: "#9CA3AF" }}
+                tick={{ fontSize: 12, fill: "hsl(var(--ink-muted))" }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 10, fill: "#9CA3AF" }}
+                tick={{ fontSize: 11, fill: "hsl(var(--ink-muted))" }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v) => `₦${(v / 1000000).toFixed(1)}M`}
@@ -561,22 +641,17 @@ function DashboardSection({
                   `₦${Number(v).toLocaleString()}`,
                   String(n),
                 ]}
-                contentStyle={{
-                  borderRadius: 12,
-                  border: "none",
-                  boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-                  fontSize: 12,
-                }}
+                contentStyle={chartTooltipStyle}
               />
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="#F1F3FB"
+                stroke="hsl(var(--line))"
                 vertical={false}
               />
               <Area
                 type="monotone"
                 dataKey="revenue"
-                stroke="#3730A3"
+                stroke="hsl(var(--ink-primary))"
                 strokeWidth={2.5}
                 fill="url(#revenueGrad)"
                 name="Revenue"
@@ -586,7 +661,7 @@ function DashboardSection({
           )}
         </div>
 
-        <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
+        <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-line dark:border-white/10 shadow-card">
           <h3
             style={{
               fontFamily: "var(--font-family-display, 'Bricolage Grotesque')",
@@ -599,17 +674,17 @@ function DashboardSection({
           </h3>
           <div className="flex h-[220px] flex-col items-center justify-center gap-2 text-center">
             {pendingKycQuery.isLoading ? (
-              <span className="text-sm text-[#9CA3AF]">Loading pending KYC...</span>
+              <span className="text-sm text-ink-muted">Loading pending KYC...</span>
             ) : pendingKycQuery.isError ? (
               <>
                 <span className="text-sm text-red-600">{pendingKycQuery.error.message}</span>
-                <button onClick={() => void pendingKycQuery.refetch()} className="text-sm font-semibold text-[#3730A3]">Retry</button>
+                <button onClick={() => void pendingKycQuery.refetch()} className="text-sm font-semibold text-ink-primary">Retry</button>
               </>
             ) : (
               <>
-                <span className="text-4xl font-bold text-[#D97706]">{pendingKycQuery.data.length}</span>
-                <span className="text-sm text-[#6B7280] dark:text-[#94A3B8]">Pending submissions</span>
-                <span className="max-w-[230px] text-xs text-[#9CA3AF]">The API collection does not provide approved/rejected counts for a KYC breakdown chart.</span>
+                <span className="text-4xl font-bold text-ink-warning">{pendingKycQuery.data.length}</span>
+                <span className="text-sm text-ink-muted dark:text-[#94A3B8]">Pending submissions</span>
+                <span className="max-w-[230px] text-xs text-ink-muted">The API collection does not provide approved/rejected counts for a KYC breakdown chart.</span>
               </>
             )}
           </div>
@@ -617,7 +692,7 @@ function DashboardSection({
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
+        <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-line dark:border-white/10 shadow-card">
           <h3
             style={{
               fontFamily: "var(--font-family-display, 'Bricolage Grotesque')",
@@ -629,38 +704,34 @@ function DashboardSection({
             Member Growth
           </h3>
           {memberGrowthQuery.isLoading ? (
-            <div className="flex h-[160px] items-center justify-center text-sm text-[#9CA3AF]">Loading member growth...</div>
+            <div className="flex h-[160px] items-center justify-center text-sm text-ink-muted">Loading member growth...</div>
           ) : memberGrowthQuery.isError ? (
             <div className="flex h-[160px] flex-col items-center justify-center gap-3 text-sm text-red-600">
               <span>{memberGrowthQuery.error.message}</span>
-              <button onClick={() => void memberGrowthQuery.refetch()} className="font-semibold text-[#3730A3]">Retry</button>
+              <button onClick={() => void memberGrowthQuery.refetch()} className="font-semibold text-ink-primary">Retry</button>
             </div>
           ) : memberGrowth.length === 0 ? (
-            <div className="flex h-[160px] items-center justify-center text-sm text-[#9CA3AF]">No monthly member growth data found.</div>
+            <div className="flex h-[160px] items-center justify-center text-sm text-ink-muted">No monthly member growth data found.</div>
           ) : (
           <ResponsiveContainer width="100%" height={160}>
             <BarChart data={memberGrowth}>
               <XAxis
                 dataKey="month"
-                tick={{ fontSize: 11, fill: "#9CA3AF" }}
+                tick={{ fontSize: 12, fill: "hsl(var(--ink-muted))" }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 10, fill: "#9CA3AF" }}
+                tick={{ fontSize: 11, fill: "hsl(var(--ink-muted))" }}
                 axisLine={false}
                 tickLine={false}
               />
               <Tooltip
-                contentStyle={{
-                  borderRadius: 12,
-                  border: "none",
-                  fontSize: 12,
-                }}
+                contentStyle={chartTooltipStyle}
               />
               <Bar
                 dataKey="members"
-                fill="#3730A3"
+                fill="hsl(var(--ink-primary))"
                 radius={[6, 6, 0, 0]}
                 name="Registrations"
                 cursor="pointer"
@@ -675,20 +746,20 @@ function DashboardSection({
                   {selectedMemberGrowth ? (
             <div className="mt-3 flex items-center justify-between rounded-xl border border-[#DDE3FF] bg-[#F5F6FF] px-4 py-3 dark:border-[#818CF8]/20 dark:bg-[#818CF8]/10" role="status">
               <div>
-                <p className="text-xs font-medium text-[#6B7280] dark:text-[#A5B4FC]">{selectedMemberGrowth.month}</p>
+                <p className="text-xs font-medium text-ink-muted dark:text-[#A5B4FC]">{selectedMemberGrowth.month}</p>
                 <p className="text-sm font-semibold text-[#1F2937] dark:text-[#F0F2FF]">
                   {selectedMemberGrowth.members.toLocaleString()} registered users
                 </p>
               </div>
-              <button type="button" onClick={() => setSelectedMemberGrowth(null)} className="rounded-lg px-2 py-1 text-xs font-semibold text-[#3730A3] hover:bg-white dark:text-[#A5B4FC] dark:hover:bg-white/10">
+              <button type="button" onClick={() => setSelectedMemberGrowth(null)} className="rounded-lg px-2 py-1 text-xs font-semibold text-ink-primary hover:bg-white dark:text-[#A5B4FC] dark:hover:bg-white/10">
                 Clear
               </button>
             </div>
           ) : (
-            <p className="mt-2 text-xs text-[#9CA3AF]">Select a month to see its registration total.</p>
+            <p className="mt-2 text-xs text-ink-muted">Select a month to see its registration total.</p>
           )}</div>
 
-        <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
+        <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-line dark:border-white/10 shadow-card">
           <h3
             style={{
               fontFamily: "var(--font-family-display, 'Bricolage Grotesque')",
@@ -700,15 +771,15 @@ function DashboardSection({
             Recent Transactions
           </h3>
           <div className="flex flex-col gap-3">
-            {transactionsQuery.isLoading ? <div className="text-sm text-[#9CA3AF]">Loading transactions...</div> : null}
+            {transactionsQuery.isLoading ? <div className="text-sm text-ink-muted">Loading transactions...</div> : null}
             {transactionsQuery.isError ? (
               <div className="text-sm text-red-600">
                 <p>{transactionsQuery.error.message}</p>
-                <button onClick={() => void transactionsQuery.refetch()} className="mt-2 font-semibold text-[#3730A3]">Retry</button>
+                <button onClick={() => void transactionsQuery.refetch()} className="mt-2 font-semibold text-ink-primary">Retry</button>
               </div>
             ) : null}
             {!transactionsQuery.isLoading && !transactionsQuery.isError && recentTransactions.length === 0 ? (
-              <div className="text-sm text-[#9CA3AF]">No transactions found.</div>
+              <div className="text-sm text-ink-muted">No transactions found.</div>
             ) : null}
             {recentTransactions.map((transaction) => (
               <div key={transaction._id} className="flex items-center gap-3">
@@ -719,7 +790,7 @@ function DashboardSection({
                   <div className="truncate text-sm text-[#374151] dark:text-[#F0F2FF]">
                     {transaction.description || transaction.type || transaction.reference}
                   </div>
-                  <div className="text-xs text-[#9CA3AF]">
+                  <div className="text-xs text-ink-muted">
                     {new Date(transaction.createdAt).toLocaleString()}
                   </div>
                 </div>
@@ -733,7 +804,7 @@ function DashboardSection({
       <div className="bg-[#FFFBEB] dark:bg-[#FBBF24]/10 border border-[#FCD34D] dark:border-[#FBBF24]/30 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
         <div className="flex items-center gap-4">
           <div className="w-11 h-11 bg-[#FEF3C7] dark:bg-[#FBBF24]/20 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Shield size={22} className="text-[#D97706]" />
+            <Shield size={22} className="text-ink-warning" />
           </div>
           <div>
             <div className="font-bold text-[#92400E] dark:text-[#FBBF24]">
@@ -854,23 +925,23 @@ function MembersSection({
       />
       <section className="mb-4 flex flex-col gap-4 rounded-2xl border border-[#E8EAF4] bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#111327] sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#8A91A5]">New registrations</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">New registrations</p>
           <div className="mt-1 flex items-baseline gap-2">
             <span className="text-2xl font-bold text-[#111827] dark:text-[#F0F2FF]">
               {isLoading ? "…" : error ? "Unavailable" : registrationCount === undefined ? "Unavailable" : registrationCount.toLocaleString()}
             </span>
-            <span className="text-sm text-[#6B7280] dark:text-[#94A3B8]">{registrationPeriodLabel}</span>
+            <span className="text-sm text-ink-muted dark:text-[#94A3B8]">{registrationPeriodLabel}</span>
           </div>
-          <p className="mt-1 text-xs text-[#9CA3AF]">
+          <p className="mt-1 text-xs text-ink-muted">
             {datedMembers.length.toLocaleString()} of {members.length.toLocaleString()} members have a registration date.
           </p>
         </div>
         <div className="w-full sm:w-52">
-          <label htmlFor="member-registration-period" className="mb-1.5 block text-xs font-medium text-[#6B7280] dark:text-[#94A3B8]">
+          <label htmlFor="member-registration-period" className="mb-1.5 block text-xs font-medium text-ink-muted dark:text-[#94A3B8]">
             Registration period
           </label>
           <Select value={registrationPeriod} onValueChange={(value) => { setRegistrationPeriod(value as RegistrationPeriod); setMemberPage(1); }}>
-            <SelectTrigger id="member-registration-period" className="h-10 rounded-xl border-[#E1E5EF] bg-[#F8F9FC] dark:border-white/10 dark:bg-white/5">
+            <SelectTrigger id="member-registration-period" className="h-10 rounded-xl border-[#C9CEDF] bg-[#F8F9FC] dark:border-white/10 dark:bg-white/5">
               <SelectValue placeholder="Choose a period" />
             </SelectTrigger>
             <SelectContent position="popper" className="rounded-xl">
@@ -884,15 +955,15 @@ function MembersSection({
             </SelectContent>
           </Select>
         </div>
-      </section>      <div className="bg-white dark:bg-[#111327] rounded-2xl border border-[#F1F3FB] dark:border-white/10 overflow-hidden shadow-sm">
-        <div className="p-4 border-b border-[#F1F3FB] dark:border-white/10 flex flex-col sm:flex-row gap-3">
+      </section>      <div className="bg-white dark:bg-[#111327] rounded-2xl border border-line dark:border-white/10 overflow-hidden shadow-sm">
+        <div className="p-4 border-b border-line dark:border-white/10 flex flex-col sm:flex-row gap-3">
           <div className="flex-1 flex items-center gap-2 bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-2.5">
-            <Search size={16} className="text-[#9CA3AF]" />
+            <Search size={16} className="text-ink-muted" />
             <input
               value={search}
               onChange={(e) => { setSearch(e.target.value); setMemberPage(1); }}
               placeholder="Search members..."
-              className="flex-1 bg-transparent text-sm outline-none text-[#0D0F1C] dark:text-[#F0F2FF] placeholder:text-[#9CA3AF]"
+              className="flex-1 bg-transparent text-sm outline-none text-[#0D0F1C] dark:text-[#F0F2FF] placeholder:text-ink-muted"
             />
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
@@ -912,27 +983,27 @@ function MembersSection({
           </div>
         </div>
         {isLoading ? (
-          <div className="p-8 text-center text-sm text-[#9CA3AF]">Loading users...</div>
+          <div className="p-8 text-center text-sm text-ink-muted">Loading users...</div>
         ) : error ? (
           <div className="p-8 text-center">
             <p role="alert" className="mb-3 text-sm text-red-600">{error}</p>
-            <button onClick={onRetry} className="text-sm font-semibold text-[#3730A3]">Retry</button>
+            <button onClick={onRetry} className="text-sm font-semibold text-ink-primary">Retry</button>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="p-8 text-center text-sm text-[#9CA3AF]">
+          <div className="p-8 text-center text-sm text-ink-muted">
             {members.length === 0 ? "No users found." : `No users registered ${registrationPeriodLabel.toLowerCase()} match these filters.`}
           </div>
         ) : (
         <>
-        <div className="flex flex-col gap-1 border-b border-[#F1F3FB] px-4 py-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-1 border-b border-line px-4 py-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm font-semibold text-[#1F2937] dark:text-[#F0F2FF]">
             {filtered.length.toLocaleString()} members registered {registrationPeriodLabel.toLowerCase()}
           </p>
-          <p className="text-xs text-[#8A91A5]">Showing {firstVisibleMember.toLocaleString()}–{lastVisibleMember.toLocaleString()}</p>
+          <p className="text-xs text-ink-muted">Showing {firstVisibleMember.toLocaleString()}–{lastVisibleMember.toLocaleString()}</p>
         </div>
         <div className="max-h-[min(65vh,640px)] overflow-auto">
           <table className="w-full min-w-[650px]">
-            <thead className="sticky top-0 z-10 bg-[#F9FAFB] dark:bg-[#17192F] border-b border-[#F1F3FB] dark:border-white/10">
+            <thead className="sticky top-0 z-10 bg-[#F9FAFB] dark:bg-[#17192F] border-b border-line dark:border-white/10">
               <tr>
                 {[
                   "Member",
@@ -945,14 +1016,14 @@ function MembersSection({
                 ].map((h, i) => (
                   <th
                     key={h || i}
-                    className="text-left px-4 py-3 text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider"
+                    className="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider"
                   >
                     {h || <span className="sr-only">Open</span>}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#F9FAFB] dark:divide-white/5">
+            <tbody className="divide-y divide-line dark:divide-white/10">
               {visibleMembers.map((m) => (
                 <tr
                   key={m.id}
@@ -973,7 +1044,7 @@ function MembersSection({
                 >
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-[#EEF2FF] dark:bg-[#818CF8]/20 flex items-center justify-center text-[#3730A3] dark:text-[#818CF8] text-sm font-bold flex-shrink-0">
+                      <div className="w-9 h-9 rounded-full bg-[#EEF2FF] dark:bg-[#818CF8]/20 flex items-center justify-center text-ink-primary dark:text-[#818CF8] text-sm font-bold flex-shrink-0">
                         {m.name
                           .split(" ")
                           .map((n) => n[0])
@@ -983,11 +1054,11 @@ function MembersSection({
                         <div className="text-sm font-medium text-[#0D0F1C] dark:text-[#F0F2FF]">
                           {m.name}
                         </div>
-                        <div className="text-xs text-[#9CA3AF]">{m.email}</div>
+                        <div className="text-xs text-ink-muted">{m.email}</div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3.5 text-sm text-[#6B7280] dark:text-[#94A3B8]">
+                  <td className="px-4 py-3.5 text-sm text-ink-muted dark:text-[#94A3B8]">
                     {m.group}
                   </td>
                   <td className="px-4 py-3.5 text-sm font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
@@ -1012,7 +1083,7 @@ function MembersSection({
                     <ChevronRight
                       size={16}
                       aria-hidden="true"
-                      className="inline text-[#9CA3AF] transition-transform group-hover:translate-x-0.5 group-hover:text-[#3730A3]"
+                      className="inline text-ink-muted transition-transform group-hover:translate-x-0.5 group-hover:text-ink-primary"
                     />
                   </td>
                 </tr>
@@ -1020,11 +1091,11 @@ function MembersSection({
             </tbody>
           </table>
         </div>
-        <div className="flex flex-col gap-3 border-t border-[#F1F3FB] px-4 py-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-[#8A91A5]">Page {currentPage} of {totalPages} · 25 members per page</p>
+        <div className="flex flex-col gap-3 border-t border-line px-4 py-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-ink-muted">Page {currentPage} of {totalPages} · 25 members per page</p>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setMemberPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1} className="rounded-lg border border-[#E1E5EF] px-3 py-1.5 text-sm font-medium text-[#374151] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:text-gray-300">Previous</button>
-            <button type="button" onClick={() => setMemberPage((page) => Math.min(totalPages, page + 1))} disabled={currentPage === totalPages} className="rounded-lg border border-[#E1E5EF] px-3 py-1.5 text-sm font-medium text-[#374151] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:text-gray-300">Next</button>
+            <button type="button" onClick={() => setMemberPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1} className="rounded-lg border border-[#C9CEDF] px-3 py-1.5 text-sm font-medium text-[#374151] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:text-gray-300">Previous</button>
+            <button type="button" onClick={() => setMemberPage((page) => Math.min(totalPages, page + 1))} disabled={currentPage === totalPages} className="rounded-lg border border-[#C9CEDF] px-3 py-1.5 text-sm font-medium text-[#374151] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:text-gray-300">Next</button>
           </div>
         </div>
         </>
@@ -1047,14 +1118,14 @@ function MemberDetailSection({
 
   if (!member) {
     return (
-      <div className="rounded-2xl border border-[#F1F3FB] bg-white p-8 text-center text-sm text-[#9CA3AF] dark:border-white/10 dark:bg-[#111327]">
+      <div className="rounded-2xl border border-line bg-white p-8 text-center text-sm text-ink-muted dark:border-white/10 dark:bg-[#111327]">
         Select a member from the users list to view details.
-        <button onClick={onBack} className="ml-2 font-semibold text-[#3730A3]">Back to members</button>
+        <button onClick={onBack} className="ml-2 font-semibold text-ink-primary">Back to members</button>
       </div>
     );
   }
   if (detailsQuery.isLoading) {
-    return <div className="rounded-2xl bg-white p-8 text-center text-sm text-[#9CA3AF] dark:bg-[#111327]">Loading member details...</div>;
+    return <div className="rounded-2xl bg-white p-8 text-center text-sm text-ink-muted dark:bg-[#111327]">Loading member details...</div>;
   }
   if (detailsQuery.isError || !detailsQuery.data) {
     return (
@@ -1062,7 +1133,7 @@ function MemberDetailSection({
         <p role="alert" className="mb-3 text-sm text-red-600">
           {detailsQuery.error instanceof Error ? detailsQuery.error.message : "Unable to load member details"}
         </p>
-        <button onClick={() => void detailsQuery.refetch()} className="font-semibold text-[#3730A3]">Retry</button>
+        <button onClick={() => void detailsQuery.refetch()} className="font-semibold text-ink-primary">Retry</button>
       </div>
     );
   }
@@ -1085,7 +1156,7 @@ function MemberDetailSection({
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={onBack}
-          className="w-9 h-9 rounded-xl bg-white dark:bg-[#111327] border border-[#E5E7EB] dark:border-white/10 flex items-center justify-center hover:bg-[#F9FAFB] transition-colors"
+          className="w-9 h-9 rounded-xl bg-white dark:bg-[#111327] border border-[#C9CEDF] dark:border-white/10 flex items-center justify-center hover:bg-[#F9FAFB] transition-colors"
         >
           <ChevronLeft
             size={18}
@@ -1101,14 +1172,14 @@ function MemberDetailSection({
           >
             {m.name}
           </h1>
-          <p className="text-[#6B7280] dark:text-[#94A3B8] text-sm">
+          <p className="text-ink-muted dark:text-[#94A3B8] text-sm">
             Member since {m.signUpOn ? new Date(m.signUpOn).toLocaleDateString() : "Not available"}
           </p>
         </div>
       </div>
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="xl:col-span-1 bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 flex flex-col items-center text-center gap-4 shadow-sm">
-          <div className="w-20 h-20 rounded-full bg-[#EEF2FF] dark:bg-[#818CF8]/20 flex items-center justify-center text-[#3730A3] dark:text-[#818CF8] text-2xl font-bold">
+        <div className="xl:col-span-1 bg-white dark:bg-[#111327] rounded-2xl p-5 border border-line dark:border-white/10 flex flex-col items-center text-center gap-4 shadow-sm">
+          <div className="w-20 h-20 rounded-full bg-[#EEF2FF] dark:bg-[#818CF8]/20 flex items-center justify-center text-ink-primary dark:text-[#818CF8] text-2xl font-bold">
             {m.name
               .split(" ")
               .map((n) => n[0])
@@ -1118,16 +1189,16 @@ function MemberDetailSection({
             <div className="font-bold text-lg text-[#0D0F1C] dark:text-[#F0F2FF]">
               {m.name}
             </div>
-            <div className="text-sm text-[#9CA3AF]">{m.email}</div>
-            <div className="text-sm text-[#9CA3AF]">{m.phone || "Not available"}</div>
+            <div className="text-sm text-ink-muted">{m.email}</div>
+            <div className="text-sm text-ink-muted">{m.phone || "Not available"}</div>
           </div>
           <Badge color="gray">KYC: Not available</Badge>
           <div className="grid grid-cols-2 gap-3 w-full">
-            <a href={`mailto:${m.email}`} className="py-2 bg-[#EEF2FF] dark:bg-[#818CF8]/20 text-[#3730A3] dark:text-[#818CF8] rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 hover:opacity-90">
+            <a href={`mailto:${m.email}`} className="py-2 bg-[#EEF2FF] dark:bg-[#818CF8]/20 text-ink-primary dark:text-[#818CF8] rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 hover:opacity-90">
               <Mail size={13} />
               Email
             </a>
-            <button disabled title="Direct messaging from the admin hub is not connected yet" className="py-2 bg-[#ECFDF5] dark:bg-[#10B981]/20 text-[#059669] dark:text-[#10B981] rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 opacity-50">
+            <button disabled title="Direct messaging from the admin hub is not connected yet" className="py-2 bg-[#ECFDF5] dark:bg-[#10B981]/20 text-ink-success dark:text-[#6EE7B7] rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 opacity-50">
               <MessageSquare size={13} />
               Message unavailable
             </button>
@@ -1135,8 +1206,8 @@ function MemberDetailSection({
         </div>
         <div className="xl:col-span-2 flex flex-col gap-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-white dark:bg-[#111327] rounded-2xl p-4 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
-              <div className="text-xs text-[#9CA3AF] mb-1">Wallet Balance</div>
+            <div className="bg-white dark:bg-[#111327] rounded-2xl p-4 border border-line dark:border-white/10 shadow-card">
+              <div className="text-xs text-ink-muted mb-1">Wallet Balance</div>
               <div
                 className="text-xl font-bold text-[#0D0F1C] dark:text-[#F0F2FF]"
                 style={{
@@ -1147,10 +1218,10 @@ function MemberDetailSection({
                 {m.balance === undefined ? "—" : fmt(Number(m.balance))}
               </div>
             </div>
-            <div className="bg-white dark:bg-[#111327] rounded-2xl p-4 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
-              <div className="text-xs text-[#9CA3AF] mb-1">Total Savings</div>
+            <div className="bg-white dark:bg-[#111327] rounded-2xl p-4 border border-line dark:border-white/10 shadow-card">
+              <div className="text-xs text-ink-muted mb-1">Total Savings</div>
               <div
-                className="text-xl font-bold text-[#059669]"
+                className="text-xl font-bold text-ink-success"
                 style={{
                   fontFamily:
                     "var(--font-family-display, 'Bricolage Grotesque')",
@@ -1160,7 +1231,7 @@ function MemberDetailSection({
               </div>
             </div>
           </div>
-          <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
+          <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-line dark:border-white/10 shadow-card">
             <div className="font-semibold text-[#0D0F1C] dark:text-[#F0F2FF] mb-3">
               Member Info
             </div>
@@ -1177,7 +1248,7 @@ function MemberDetailSection({
                   key={k}
                   className="flex justify-between text-sm py-1 border-b border-[#F9FAFB] dark:border-white/5 last:border-0"
                 >
-                  <span className="text-[#9CA3AF]">{k}</span>
+                  <span className="text-ink-muted">{k}</span>
                   <span className="font-medium capitalize text-[#0D0F1C] dark:text-[#F0F2FF]">
                     {v}
                   </span>
@@ -1189,7 +1260,7 @@ function MemberDetailSection({
             <button
               onClick={() => void handleBlock()}
               disabled={blockUser.isPending}
-              className="flex-1 py-2.5 bg-[#FEF2F2] text-[#DC2626] hover:bg-[#FEE2E2] dark:bg-[#EF4444]/20 dark:text-[#EF4444] rounded-xl text-sm font-semibold transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex-1 py-2.5 bg-[#FEF2F2] text-ink-danger hover:bg-[#FEE2E2] dark:bg-[#EF4444]/20 dark:text-[#FCA5A5] rounded-xl text-sm font-semibold transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
             >
               {blockUser.isPending ? "Updating..." : blocked ? "Unblock Member" : "Block Member"}
             </button>
@@ -1242,15 +1313,15 @@ function KYCSection({
         subtitle={`${queue.length} pending reviews`}
         action={
           <div className="flex items-center gap-2" aria-label="KYC card size">
-            <span className="text-xs text-[#6B7280] dark:text-[#94A3B8]">Card size</span>
-            <div className="inline-flex rounded-lg border border-[#E1E5EF] bg-white p-1 dark:border-white/10 dark:bg-[#111327]">
+            <span className="text-xs text-ink-muted dark:text-[#94A3B8]">Card size</span>
+            <div className="inline-flex rounded-lg border border-[#C9CEDF] bg-white p-1 dark:border-white/10 dark:bg-[#111327]">
               {(["compact", "comfortable"] as const).map((density) => (
                 <button
                   key={density}
                   type="button"
                   aria-pressed={cardDensity === density}
                   onClick={() => setCardDensity(density)}
-                  className={`rounded-md px-2.5 py-1.5 text-xs font-medium capitalize transition-colors ${cardDensity === density ? "bg-[#EEF2FF] text-[#3730A3] dark:bg-[#818CF8]/20 dark:text-[#818CF8]" : "text-[#6B7280] hover:bg-[#F9FAFB] dark:text-[#94A3B8] dark:hover:bg-white/5"}`}
+                  className={`rounded-md px-2.5 py-1.5 text-xs font-medium capitalize transition-colors ${cardDensity === density ? "bg-[#EEF2FF] text-ink-primary dark:bg-[#818CF8]/20 dark:text-[#818CF8]" : "text-ink-muted hover:bg-[#F9FAFB] dark:text-[#94A3B8] dark:hover:bg-white/5"}`}
                 >
                   {density}
                 </button>
@@ -1260,7 +1331,7 @@ function KYCSection({
         }
       />
       {isLoading ? (
-        <div className="rounded-2xl border border-[#F1F3FB] bg-white p-8 text-center text-sm text-[#9CA3AF] shadow-sm dark:border-white/10 dark:bg-[#111327]">
+        <div className="rounded-2xl border border-line bg-white p-8 text-center text-sm text-ink-muted shadow-sm dark:border-white/10 dark:bg-[#111327]">
           Loading pending KYC submissions...
         </div>
       ) : loadError ? (
@@ -1274,8 +1345,8 @@ function KYCSection({
           </button>
         </div>
       ) : queue.length === 0 ? (
-        <div className="bg-white dark:bg-[#111327] rounded-2xl p-16 border border-[#F1F3FB] dark:border-white/10 flex flex-col items-center gap-4 text-center shadow-sm">
-          <CheckCircle size={48} className="text-[#059669]" />
+        <div className="bg-white dark:bg-[#111327] rounded-2xl p-16 border border-line dark:border-white/10 flex flex-col items-center gap-4 text-center shadow-sm">
+          <CheckCircle size={48} className="text-ink-success" />
           <h3
             style={{
               fontFamily: "var(--font-family-display, 'Bricolage Grotesque')",
@@ -1286,7 +1357,7 @@ function KYCSection({
           >
             All caught up!
           </h3>
-          <p className="text-[#9CA3AF] text-sm max-w-sm">
+          <p className="text-ink-muted text-sm max-w-sm">
             No KYC submissions are currently pending review. Great job
             maintaining customer verifications!
           </p>
@@ -1296,11 +1367,11 @@ function KYCSection({
           {queue.map((k) => (
             <div
               key={k.id}
-              className={`bg-white dark:bg-[#111327] rounded-2xl ${cardDensity === "compact" ? "p-3 sm:p-4" : "p-5"} border border-[#F1F3FB] dark:border-white/10 shadow-sm`}
+              className={`bg-white dark:bg-[#111327] rounded-2xl ${cardDensity === "compact" ? "p-3 sm:p-4" : "p-5"} border border-line dark:border-white/10 shadow-card`}
             >
               <div className={`flex items-start justify-between ${cardDensity === "compact" ? "mb-2.5" : "mb-4"}`}>
                 <div className={`flex items-center ${cardDensity === "compact" ? "gap-2.5" : "gap-3"}`}>
-                  <div className={`${cardDensity === "compact" ? "h-9 w-9 text-sm" : "h-11 w-11"} rounded-full bg-[#EEF2FF] dark:bg-[#818CF8]/20 flex items-center justify-center text-[#3730A3] dark:text-[#818CF8] font-bold`}>
+                  <div className={`${cardDensity === "compact" ? "h-9 w-9 text-sm" : "h-11 w-11"} rounded-full bg-[#EEF2FF] dark:bg-[#818CF8]/20 flex items-center justify-center text-ink-primary dark:text-[#818CF8] font-bold`}>
                     {k.name
                       .split(" ")
                       .map((n) => n[0])
@@ -1310,7 +1381,7 @@ function KYCSection({
                     <div className="font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
                       {k.name}
                     </div>
-                    <div className="text-xs text-[#9CA3AF]">
+                    <div className="text-xs text-ink-muted">
                       {k.email} · Submitted {k.submitted}
                     </div>
                   </div>
@@ -1329,7 +1400,7 @@ function KYCSection({
                     key={l}
                     className={`bg-[#F9FAFB] dark:bg-white/5 rounded-xl ${cardDensity === "compact" ? "p-2" : "p-3"}`}
                   >
-                    <div className="text-xs text-[#9CA3AF]">{l}</div>
+                    <div className="text-xs text-ink-muted">{l}</div>
                     <div className="text-sm font-semibold text-[#0D0F1C] dark:text-[#F0F2FF] mt-0.5">
                       {v}
                     </div>
@@ -1344,8 +1415,8 @@ function KYCSection({
                     className={`${cardDensity === "compact" ? "h-24" : "h-32"} w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl flex items-center justify-center cursor-pointer border border-dashed border-[#D1D5DB] dark:border-white/10`}
                   >
                     <div className="text-center">
-                      <Eye size={20} className="text-[#9CA3AF] mx-auto" />
-                      <div className="text-xs text-[#9CA3AF] font-medium mt-1">
+                      <Eye size={20} className="text-ink-muted mx-auto" />
+                      <div className="text-xs text-ink-muted font-medium mt-1">
                       Not included in API response
                       </div>
                     </div>
@@ -1355,14 +1426,14 @@ function KYCSection({
               <div className={`flex flex-col sm:flex-row ${cardDensity === "compact" ? "gap-2" : "gap-3"}`}>
                 <button
                   onClick={() => setAction({ id: k.id, type: "approve" })}
-                  className={`flex-1 ${cardDensity === "compact" ? "py-2 text-xs" : "py-2.5 text-sm"} bg-[#ECFDF5] hover:bg-[#D1FAE5] text-[#059669] dark:bg-[#10B981]/20 dark:text-[#10B981] rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm`}
+                  className={`flex-1 ${cardDensity === "compact" ? "py-2 text-xs" : "py-2.5 text-sm"} bg-[#ECFDF5] hover:bg-[#D1FAE5] text-ink-success dark:bg-[#10B981]/20 dark:text-[#6EE7B7] rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm`}
                 >
                   <CheckCircle size={16} />
                   Approve
                 </button>
                 <button
                   onClick={() => setAction({ id: k.id, type: "reject" })}
-                  className={`flex-1 ${cardDensity === "compact" ? "py-2 text-xs" : "py-2.5 text-sm"} bg-[#FEF2F2] hover:bg-[#FEE2E2] text-[#DC2626] dark:bg-[#EF4444]/20 dark:text-[#EF4444] rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm`}
+                  className={`flex-1 ${cardDensity === "compact" ? "py-2 text-xs" : "py-2.5 text-sm"} bg-[#FEF2F2] hover:bg-[#FEE2E2] text-ink-danger dark:bg-[#EF4444]/20 dark:text-[#FCA5A5] rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm`}
                 >
                   <XCircle size={16} />
                   Reject
@@ -1384,9 +1455,10 @@ function KYCSection({
             onClick={() => setPreviewDoc(null)}
           >
             <motion.div
-              initial={{ scale: 0.95 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.95 }}
+              initial={{ scale: 0.95, y: 8 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 8 }}
+              transition={{ type: "spring", stiffness: 380, damping: 30 }}
               className="bg-white dark:bg-[#111327] rounded-2xl p-6 w-full max-w-lg shadow-2xl border border-white/10"
               onClick={(e) => e.stopPropagation()}
             >
@@ -1396,18 +1468,18 @@ function KYCSection({
                 </h3>
                 <button
                   onClick={() => setPreviewDoc(null)}
-                  className="text-[#9CA3AF] hover:text-foreground"
+                  className="text-ink-muted hover:text-foreground"
                 >
                   <X size={20} />
                 </button>
               </div>
               <div className="aspect-[16/10] bg-[#F1F3FB] dark:bg-white/5 rounded-xl flex items-center justify-center overflow-hidden border border-dashed border-gray-300 dark:border-gray-700">
                 <div className="text-center p-6">
-                  <Shield size={48} className="text-[#3730A3] mx-auto mb-2 opacity-50" />
+                  <Shield size={48} className="text-ink-primary mx-auto mb-2 opacity-50" />
                   <p className="text-sm font-medium text-[#374151] dark:text-gray-300">
                     Document image unavailable
                   </p>
-                  <p className="text-xs text-[#9CA3AF] mt-1">
+                  <p className="text-xs text-ink-muted mt-1">
                     The pending-KYC API does not include a document URL or image.
                   </p>
                 </div>
@@ -1441,7 +1513,7 @@ function KYCSection({
               className="bg-white dark:bg-[#111327] rounded-2xl p-6 w-full max-w-sm shadow-xl border border-white/10"
             >
               <div
-                className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 ${action.type === "approve" ? "bg-[#ECFDF5] text-[#059669]" : "bg-[#FEF2F2] text-[#DC2626]"}`}
+                className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 ${action.type === "approve" ? "bg-[#ECFDF5] text-[#047857]" : "bg-[#FEF2F2] text-[#B91C1C]"}`}
               >
                 {action.type === "approve" ? (
                   <CheckCircle size={32} />
@@ -1460,7 +1532,7 @@ function KYCSection({
               >
                 {action.type === "approve" ? "Approve KYC?" : "Reject KYC?"}
               </h3>
-              <p className="text-[#6B7280] dark:text-[#94A3B8] text-sm text-center mt-2">
+              <p className="text-ink-muted dark:text-[#94A3B8] text-sm text-center mt-2">
                 {action.type === "approve"
                   ? "This member will gain full access to PAVE wallet and savings features."
                   : "Please provide a reason for rejecting this verification."}
@@ -1480,7 +1552,7 @@ function KYCSection({
                     setAction(null);
                     setReason("");
                   }}
-                  className="flex-1 py-2.5 border-2 border-[#E5E7EB] dark:border-white/10 rounded-xl text-sm font-medium hover:bg-[#F9FAFB] dark:hover:bg-white/5 text-[#374151] dark:text-gray-300"
+                  className="flex-1 py-2.5 border-2 border-[#C9CEDF] dark:border-white/10 rounded-xl text-sm font-medium hover:bg-[#F9FAFB] dark:hover:bg-white/5 text-[#374151] dark:text-gray-300"
                 >
                   Cancel
                 </button>
@@ -1608,7 +1680,7 @@ function SavingsProgramsSection({
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="bg-white dark:bg-[#111327] rounded-2xl p-6 border border-[#F1F3FB] dark:border-white/10 mb-5 shadow-md"
+            className="bg-white dark:bg-[#111327] rounded-2xl p-6 border border-line dark:border-white/10 mb-5 shadow-md"
           >
             <div className="flex items-center justify-between mb-4">
               <h3
@@ -1623,7 +1695,7 @@ function SavingsProgramsSection({
                 Create New Program
               </h3>
               <button type="button" onClick={() => setShowForm(false)}>
-                <X size={18} className="text-[#9CA3AF]" />
+                <X size={18} className="text-ink-muted" />
               </button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -1746,7 +1818,7 @@ function SavingsProgramsSection({
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="flex-1 py-2.5 border-2 border-[#E5E7EB] dark:border-white/10 rounded-xl text-sm font-medium hover:bg-[#F9FAFB] dark:hover:bg-white/5 text-[#374151] dark:text-gray-300"
+                className="flex-1 py-2.5 border-2 border-[#C9CEDF] dark:border-white/10 rounded-xl text-sm font-medium hover:bg-[#F9FAFB] dark:hover:bg-white/5 text-[#374151] dark:text-gray-300"
               >
                 Cancel
               </button>
@@ -1763,16 +1835,16 @@ function SavingsProgramsSection({
       </AnimatePresence>
 
       {isLoading ? (
-        <div className="rounded-2xl bg-white p-8 text-center text-sm text-[#9CA3AF] dark:bg-[#111327]">Loading savings groups...</div>
+        <div className="rounded-2xl bg-white p-8 text-center text-sm text-ink-muted dark:bg-[#111327]">Loading savings groups...</div>
       ) : error ? (
         <div className="rounded-2xl bg-white p-8 text-center dark:bg-[#111327]">
           <p role="alert" className="mb-3 text-sm text-red-600">{error}</p>
-          <button onClick={onRetry} className="font-semibold text-[#3730A3]">Retry</button>
+          <button onClick={onRetry} className="font-semibold text-ink-primary">Retry</button>
         </div>
       ) : groups.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[#D7DDEC] bg-white p-10 text-center dark:border-white/10 dark:bg-[#111327]">
           <h3 className="text-base font-semibold text-[#1F2937] dark:text-[#F0F2FF]">No savings programs yet</h3>
-          <p className="mx-auto mt-2 max-w-md text-sm text-[#6B7280] dark:text-[#94A3B8]">
+          <p className="mx-auto mt-2 max-w-md text-sm text-ink-muted dark:text-[#94A3B8]">
             The savings-groups API returned no programs. Create the first program to get started.
           </p>
           <button type="button" onClick={() => setShowForm(true)} className="mt-5 rounded-xl bg-[#3730A3] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#312E81]">
@@ -1784,7 +1856,7 @@ function SavingsProgramsSection({
         {groups.map((p) => (
           <div
             key={p.id}
-            className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm"
+            className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-line dark:border-white/10 shadow-card"
           >
             <div className="flex items-start justify-between mb-4">
               <div>
@@ -1812,11 +1884,11 @@ function SavingsProgramsSection({
                     {p.status}
                   </Badge>
                 </div>
-                <div className="text-sm text-[#9CA3AF] mt-0.5">
+                <div className="text-sm text-ink-muted mt-0.5">
                   {p.type} · {p.members} members · Started {p.started}
                 </div>
               </div>
-              <button className="text-[#9CA3AF] hover:text-[#374151]">
+              <button className="text-ink-muted hover:text-[#374151]">
                 <MoreHorizontal size={18} />
               </button>
             </div>
@@ -1835,7 +1907,7 @@ function SavingsProgramsSection({
                 ["Progress", `${pct(p.collected, p.target)}%`],
               ].map(([k, v]) => (
                 <div key={k}>
-                  <div className="text-xs text-[#9CA3AF]">{k}</div>
+                  <div className="text-xs text-ink-muted">{k}</div>
                   <div className="font-semibold text-[#0D0F1C] dark:text-[#F0F2FF] text-sm">
                     {v}
                   </div>
@@ -1843,11 +1915,11 @@ function SavingsProgramsSection({
               ))}
             </div>
             <div className="flex items-center justify-between pt-3 border-t border-[#F9FAFB] dark:border-white/5">
-              <div className="text-xs text-[#9CA3AF]">
+              <div className="text-xs text-ink-muted">
                 Next cycle: {p.nextCycle}
               </div>
               <div className="flex gap-2">
-                <button className="px-3 py-1.5 bg-[#EEF2FF] dark:bg-[#818CF8]/20 text-[#3730A3] dark:text-[#818CF8] rounded-lg text-xs font-semibold hover:opacity-90">
+                <button className="px-3 py-1.5 bg-[#EEF2FF] dark:bg-[#818CF8]/20 text-ink-primary dark:text-[#818CF8] rounded-lg text-xs font-semibold hover:opacity-90">
                   <Users size={12} className="inline mr-1" />
                   Members
                 </button>
@@ -1936,8 +2008,8 @@ function WalletsSection({
           onRetry={() => void totalsQuery.refetch()}
         />
       )}
-      <div className="bg-white dark:bg-[#111327] rounded-2xl border border-[#F1F3FB] dark:border-white/10 overflow-hidden shadow-sm">
-        <div className="p-4 border-b border-[#F1F3FB] dark:border-white/10 flex items-center justify-between">
+      <div className="bg-white dark:bg-[#111327] rounded-2xl border border-line dark:border-white/10 overflow-hidden shadow-sm">
+        <div className="p-4 border-b border-line dark:border-white/10 flex items-center justify-between">
           <div>
             <h3
               style={{
@@ -1949,7 +2021,7 @@ function WalletsSection({
             >
               Member Wallet Balances
             </h3>
-            <p className="text-xs text-[#9CA3AF] mt-0.5">
+            <p className="text-xs text-ink-muted mt-0.5">
               Click any user to inspect documented account details and transaction history
             </p>
           </div>
@@ -1968,22 +2040,22 @@ function WalletsSection({
                 ].map((h, i) => (
                   <th
                     key={h || i}
-                    className="text-left px-4 py-3 text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider"
+                    className="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider"
                   >
                     {h || <span className="sr-only">Open</span>}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#F9FAFB] dark:divide-white/5">
+            <tbody className="divide-y divide-line dark:divide-white/10">
               {isLoading ? (
-                <tr><td colSpan={6} className="p-8 text-center text-sm text-[#9CA3AF]">Loading wallet users...</td></tr>
+                <tr><td colSpan={6} className="p-8 text-center text-sm text-ink-muted">Loading wallet users...</td></tr>
               ) : error ? (
                 <tr><td colSpan={6} className="p-8 text-center text-sm text-red-600">
-                  {error} <button onClick={onRetry} className="ml-2 font-semibold text-[#3730A3]">Retry</button>
+                  {error} <button onClick={onRetry} className="ml-2 font-semibold text-ink-primary">Retry</button>
                 </td></tr>
               ) : members.length === 0 ? (
-                <tr><td colSpan={6} className="p-8 text-center text-sm text-[#9CA3AF]">No wallet users found.</td></tr>
+                <tr><td colSpan={6} className="p-8 text-center text-sm text-ink-muted">No wallet users found.</td></tr>
               ) : members.map((m) => (
                 <tr
                   key={m.id}
@@ -2000,17 +2072,17 @@ function WalletsSection({
                 >
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-[#EEF2FF] dark:bg-[#818CF8]/20 flex items-center justify-center text-[#3730A3] dark:text-[#818CF8] text-xs font-bold">
+                      <div className="w-8 h-8 rounded-full bg-[#EEF2FF] dark:bg-[#818CF8]/20 flex items-center justify-center text-ink-primary dark:text-[#818CF8] text-xs font-bold">
                         {m.name
                           .split(" ")
                           .map((n) => n[0])
                           .join("")}
                       </div>
                       <div>
-                        <div className="text-sm font-medium text-[#0D0F1C] dark:text-[#F0F2FF] group-hover:text-[#3730A3] dark:group-hover:text-[#818CF8] transition-colors">
+                        <div className="text-sm font-medium text-[#0D0F1C] dark:text-[#F0F2FF] group-hover:text-ink-primary dark:group-hover:text-[#818CF8] transition-colors">
                           {m.name}
                         </div>
-                        <div className="text-[11px] text-[#9CA3AF]">
+                        <div className="text-xs text-ink-muted">
                           {m.accountNumber || "Not available"}
                         </div>
                       </div>
@@ -2019,16 +2091,16 @@ function WalletsSection({
                   <td className="px-4 py-3.5 font-semibold text-sm text-[#0D0F1C] dark:text-[#F0F2FF]">
                     {m.wallet === undefined ? "—" : fmt(m.wallet)}
                   </td>
-                  <td className="px-4 py-3.5 text-sm font-medium text-[#9CA3AF]">—</td>
-                  <td className="px-4 py-3.5 text-sm font-medium text-[#9CA3AF]">—</td>
-                  <td className="px-4 py-3.5 text-xs text-[#9CA3AF]">
+                  <td className="px-4 py-3.5 text-sm font-medium text-ink-muted">—</td>
+                  <td className="px-4 py-3.5 text-sm font-medium text-ink-muted">—</td>
+                  <td className="px-4 py-3.5 text-xs text-ink-muted">
                     Not available from the user-role API
                   </td>
                   <td className="px-4 py-3.5 text-right">
                     <ChevronRight
                       size={16}
                       aria-hidden="true"
-                      className="inline text-[#9CA3AF] transition-transform group-hover:translate-x-0.5 group-hover:text-[#3730A3]"
+                      className="inline text-ink-muted transition-transform group-hover:translate-x-0.5 group-hover:text-ink-primary"
                     />
                   </td>
                 </tr>
@@ -2139,7 +2211,7 @@ function AdminTransactionsSection() {
           <div className="font-medium text-[#0D0F1C] dark:text-[#F0F2FF]">
             {displayName}
           </div>
-          <div className="text-xs text-[#9CA3AF]">
+          <div className="text-xs text-ink-muted">
             {user?.email || ""}
           </div>
         </td>
@@ -2153,14 +2225,14 @@ function AdminTransactionsSection() {
         <td className="px-4 py-3 text-sm">
           <StatusPill status={transaction.status} />
         </td>
-        <td className="px-4 py-3 text-xs text-[#6B7280] dark:text-[#94A3B8]">
+        <td className="px-4 py-3 text-xs text-ink-muted dark:text-[#94A3B8]">
           {new Date(transaction.createdAt).toLocaleString()}
         </td>
         <td className="w-10 px-4 py-3 text-right">
           <ChevronRight
             size={16}
             aria-hidden="true"
-            className="inline text-[#9CA3AF] transition-transform group-hover:translate-x-0.5 group-hover:text-[#3730A3]"
+            className="inline text-ink-muted transition-transform group-hover:translate-x-0.5 group-hover:text-ink-primary"
           />
         </td>
       </tr>
@@ -2208,12 +2280,12 @@ function AdminTransactionsSection() {
         />
       </div>
 
-      <section className="rounded-2xl border border-[#F1F3FB] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111327]">
+      <section className="rounded-2xl border border-line bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111327]">
         <div className="mb-4">
           <h2 className="font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
             Search by meter number
           </h2>
-          <p className="mt-1 text-xs text-[#9CA3AF]">
+          <p className="mt-1 text-xs text-ink-muted">
             Search uses the meterNumber parameter from the Admin Search Transactions endpoint.
           </p>
         </div>
@@ -2228,7 +2300,7 @@ function AdminTransactionsSection() {
             value={meterNumberInput}
             onChange={(event) => setMeterNumberInput(event.target.value)}
             placeholder="Enter meter number"
-            className="min-w-0 flex-1 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-2.5 text-sm outline-none focus:border-[#3730A3] dark:border-white/10 dark:bg-white/5"
+            className="min-w-0 flex-1 rounded-xl border border-[#C9CEDF] bg-[#F9FAFB] px-4 py-2.5 text-sm outline-none focus:border-[#3730A3] dark:border-white/10 dark:bg-white/5"
           />
           <button
             type="submit"
@@ -2269,7 +2341,7 @@ function AdminTransactionsSection() {
             </h3>
             {hasUnsupportedSearchResults ? null : searchedTransactions.length ? (
               <table className="w-full min-w-[750px] text-left">
-                <thead className="text-xs uppercase text-[#9CA3AF]">
+                <thead className="text-xs uppercase text-ink-muted">
                   <tr>
                     <th className="px-4 py-2">User</th>
                     <th className="px-4 py-2">Reference</th>
@@ -2283,7 +2355,7 @@ function AdminTransactionsSection() {
                 <tbody>{searchedTransactions.map(renderTransactionRow)}</tbody>
               </table>
             ) : (
-              <p className="py-3 text-sm text-[#9CA3AF]">
+              <p className="py-3 text-sm text-ink-muted">
                 No transactions found for this meter number.
               </p>
             )}
@@ -2291,24 +2363,24 @@ function AdminTransactionsSection() {
         )}
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-[#F1F3FB] bg-white shadow-sm dark:border-white/10 dark:bg-[#111327]">
-        <div className="flex flex-col justify-between gap-3 border-b border-[#F1F3FB] p-5 dark:border-white/10 sm:flex-row sm:items-center">
+      <section className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm dark:border-white/10 dark:bg-[#111327]">
+        <div className="flex flex-col justify-between gap-3 border-b border-line p-5 dark:border-white/10 sm:flex-row sm:items-center">
           <div>
             <h2 className="font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
               All Transactions
             </h2>
-            <p className="mt-1 text-xs text-[#9CA3AF]">
+            <p className="mt-1 text-xs text-ink-muted">
               {transactionsQuery.isError
                 ? "Transaction count unavailable"
                 : `${transactionsQuery.data?.totalTransactions ?? 0} transactions`}
             </p>
           </div>
           <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
-            <label id="transaction-user-filter-label" className="text-xs font-medium text-[#6B7280] dark:text-[#94A3B8]">
+            <label id="transaction-user-filter-label" className="text-xs font-medium text-ink-muted dark:text-[#94A3B8]">
               Filter by user
             </label>
             <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-              <SelectTrigger aria-labelledby="transaction-user-filter-label" className="h-10 w-full rounded-xl border-[#E1E5EF] bg-[#F8F9FC] text-sm shadow-sm dark:border-white/10 dark:bg-white/5 sm:w-[250px]">
+              <SelectTrigger aria-labelledby="transaction-user-filter-label" className="h-10 w-full rounded-xl border-[#C9CEDF] bg-[#F8F9FC] text-sm shadow-sm dark:border-white/10 dark:bg-white/5 sm:w-[250px]">
                 <SelectValue placeholder="All users" />
               </SelectTrigger>
               <SelectContent position="popper" className="max-h-72 min-w-[250px] rounded-xl">
@@ -2324,7 +2396,7 @@ function AdminTransactionsSection() {
         </div>
 
         {transactionsQuery.isLoading ? (
-          <div className="p-5 text-sm text-[#9CA3AF]">
+          <div className="p-5 text-sm text-ink-muted">
             Loading all transactions...
           </div>
         ) : transactionsQuery.isError ? (
@@ -2342,7 +2414,7 @@ function AdminTransactionsSection() {
         ) : filteredTransactions.length ? (
           <div className="max-h-[65dvh] overflow-auto">
             <table className="w-full min-w-[850px] text-left">
-              <thead className="sticky top-0 z-10 bg-[#F9FAFB] text-xs uppercase text-[#9CA3AF] dark:bg-[#17192E]">
+              <thead className="sticky top-0 z-10 bg-[#F9FAFB] text-xs uppercase text-ink-muted dark:bg-[#17192E]">
                 <tr>
                   <th className="px-4 py-3">User</th>
                   <th className="px-4 py-3">Reference</th>
@@ -2353,13 +2425,13 @@ function AdminTransactionsSection() {
                   <th className="w-10 px-4 py-3"><span className="sr-only">Open</span></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#F1F3FB] dark:divide-white/5">
+              <tbody className="divide-y divide-line dark:divide-white/10">
                 {filteredTransactions.map(renderTransactionRow)}
               </tbody>
             </table>
           </div>
         ) : (
-          <div className="p-8 text-center text-sm text-[#9CA3AF]">
+          <div className="p-8 text-center text-sm text-ink-muted">
             No transactions found.
           </div>
         )}
@@ -2402,9 +2474,9 @@ function MessagingSection() {
   const [tab, setTab] = useState<"inbox" | "broadcast">("inbox");
   return <div>
     <PageHeader title="Messaging & Broadcasts" subtitle="Communicate with your members" />
-    <div className="bg-white dark:bg-[#111327] rounded-2xl overflow-hidden border border-[#F1F3FB] dark:border-white/10 shadow-sm">
-      <div className="flex border-b border-[#F1F3FB] dark:border-white/10">{(["inbox", "broadcast"] as const).map((item) => <button key={item} onClick={() => setTab(item)} className={`flex-1 py-3.5 text-sm font-semibold ${tab === item ? "bg-[#3730A3] text-white" : "text-[#9CA3AF] hover:bg-[#F9FAFB] dark:hover:bg-white/5"}`}>{item === "inbox" ? <><MessageSquare size={15} className="inline mr-2" />Inbox</> : <><Megaphone size={15} className="inline mr-2" />Broadcast</>}</button>)}</div>
-      {tab === "inbox" ? <div className="p-12 text-center text-sm text-[#9CA3AF]">The admin inbox is not connected yet. The API documents group-chat and one-to-one chat routes, but they have not been confirmed for admin accounts, so this screen stays read-only until access is verified.</div> : <div className="p-5"><div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Broadcasting is not available: the API documents chat routes but no broadcast endpoint, so messages cannot be sent to a whole cohort from here.</div><div className="flex max-w-2xl flex-col gap-4"><label className="text-xs font-medium">Send To<select disabled className="mt-1.5 w-full rounded-xl bg-[#F1F3FB] px-4 py-3 text-sm"><option>Recipients unavailable</option></select></label><label className="text-xs font-medium">Subject<input disabled placeholder="Subject" className="mt-1.5 w-full rounded-xl bg-[#F1F3FB] px-4 py-3 text-sm" /></label><label className="text-xs font-medium">Message<textarea disabled rows={6} placeholder="Broadcast message" className="mt-1.5 w-full resize-none rounded-xl bg-[#F1F3FB] px-4 py-3 text-sm" /></label><div className="flex gap-3"><button disabled className="rounded-xl border-2 border-[#E5E7EB] px-5 py-2.5 text-sm opacity-50">Schedule unavailable</button><button disabled className="flex items-center gap-2 rounded-xl bg-[#3730A3] px-6 py-2.5 text-sm font-semibold text-white opacity-50"><Send size={15} />Send unavailable</button></div></div></div>}
+    <div className="bg-white dark:bg-[#111327] rounded-2xl overflow-hidden border border-line dark:border-white/10 shadow-card">
+      <div className="flex border-b border-line dark:border-white/10">{(["inbox", "broadcast"] as const).map((item) => <button key={item} onClick={() => setTab(item)} className={`flex-1 py-3.5 text-sm font-semibold ${tab === item ? "bg-[#3730A3] text-white" : "text-ink-muted hover:bg-[#F9FAFB] dark:hover:bg-white/5"}`}>{item === "inbox" ? <><MessageSquare size={15} className="inline mr-2" />Inbox</> : <><Megaphone size={15} className="inline mr-2" />Broadcast</>}</button>)}</div>
+      {tab === "inbox" ? <div className="p-12 text-center text-sm text-[#5B6475]">The admin inbox is not connected yet. The API documents group-chat and one-to-one chat routes, but they have not been confirmed for admin accounts, so this screen stays read-only until access is verified.</div> : <div className="p-5"><div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">Broadcasting is not available: the API documents chat routes but no broadcast endpoint, so messages cannot be sent to a whole cohort from here.</div><div className="flex max-w-2xl flex-col gap-4"><label className="text-xs font-medium">Send To<select disabled className="mt-1.5 w-full rounded-xl bg-[#F1F3FB] px-4 py-3 text-sm"><option>Recipients unavailable</option></select></label><label className="text-xs font-medium">Subject<input disabled placeholder="Subject" className="mt-1.5 w-full rounded-xl bg-[#F1F3FB] px-4 py-3 text-sm" /></label><label className="text-xs font-medium">Message<textarea disabled rows={6} placeholder="Broadcast message" className="mt-1.5 w-full resize-none rounded-xl bg-[#F1F3FB] px-4 py-3 text-sm" /></label><div className="flex gap-3"><button disabled className="rounded-xl border-2 border-[#C9CEDF] px-5 py-2.5 text-sm opacity-50">Schedule unavailable</button><button disabled className="flex items-center gap-2 rounded-xl bg-[#3730A3] px-6 py-2.5 text-sm font-semibold text-white opacity-50"><Send size={15} />Send unavailable</button></div></div></div>}
     </div>
   </div>;
 }
@@ -2422,7 +2494,7 @@ function ReportsSection() {
   const groups = useAdminSavingsGroups();
   const monthly = vending.data?.monthly ?? [];
   const topUsers = leaderboard.data?.leaderboards.topByAmount ?? [];
-  const retryNotice = (query: { isLoading: boolean; isError: boolean; error: Error | null; refetch: () => Promise<unknown> }, empty: boolean, label: string) => query.isLoading ? <p className="py-10 text-center text-sm text-[#9CA3AF]">Loading {label}...</p> : query.isError ? <div role="alert" className="py-8 text-center text-sm text-red-600">{query.error?.message}<button onClick={() => void query.refetch()} className="ml-2 font-semibold">Retry</button></div> : empty ? <p className="py-10 text-center text-sm text-[#9CA3AF]">No {label} found.</p> : null;
+  const retryNotice = (query: { isLoading: boolean; isError: boolean; error: Error | null; refetch: () => Promise<unknown> }, empty: boolean, label: string) => query.isLoading ? <p className="py-10 text-center text-sm text-ink-muted">Loading {label}...</p> : query.isError ? <div role="alert" className="py-8 text-center text-sm text-red-600">{query.error?.message}<button onClick={() => void query.refetch()} className="ml-2 font-semibold">Retry</button></div> : empty ? <p className="py-10 text-center text-sm text-ink-muted">No {label} found.</p> : null;
   const healthFields = (values: Record<string, unknown>) => Object.entries(values).filter(([, value]) => ["string", "number", "boolean"].includes(typeof value));
 
   return <div>
@@ -2440,16 +2512,16 @@ function ReportsSection() {
     {yearly.isError && <QueryErrorNotice error={yearly.error} onRetry={() => void yearly.refetch()} />}
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
       <section className="rounded-2xl bg-white dark:bg-[#111327] p-5 shadow-sm"><h3 className="mb-4 font-bold">Monthly Vending Activity</h3>{retryNotice(vending, !monthly.length, "monthly vending data") ?? <ResponsiveContainer width="100%" height={200}><BarChart data={monthly}><XAxis dataKey="month" /><YAxis /><Tooltip formatter={(v: unknown) => fmt(Number(v))} /><CartesianGrid strokeDasharray="3 3" vertical={false} /><Bar dataKey="totalAmount" fill="#3730A3" name="Vending amount" /></BarChart></ResponsiveContainer>}</section>
-      <section className="rounded-2xl bg-white dark:bg-[#111327] p-5 shadow-sm"><h3 className="mb-4 font-bold">Daily Registrations</h3>{retryNotice(registrations, !registrations.data?.length, "registration data") ?? <ResponsiveContainer width="100%" height={200}><LineChart data={registrations.data}><XAxis dataKey="date" /><YAxis /><Tooltip /><CartesianGrid strokeDasharray="3 3" vertical={false} /><Line type="monotone" dataKey="registrations" stroke="#3730A3" strokeWidth={3} name="Registrations" /></LineChart></ResponsiveContainer>}</section>
+      <section className="rounded-2xl bg-white dark:bg-[#111327] p-5 shadow-sm"><h3 className="mb-4 font-bold">Daily Registrations</h3>{retryNotice(registrations, !registrations.data?.length, "registration data") ?? <ResponsiveContainer width="100%" height={200}><LineChart data={registrations.data}><XAxis dataKey="date" /><YAxis /><Tooltip /><CartesianGrid strokeDasharray="3 3" vertical={false} /><Line type="monotone" dataKey="registrations" stroke="hsl(var(--ink-primary))" strokeWidth={3} name="Registrations" /></LineChart></ResponsiveContainer>}</section>
     </div>
     <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-      <section className="rounded-2xl border border-[#F1F3FB] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111327]"><h3 className="mb-4 font-bold">Cohort Analysis</h3>{cohorts.isLoading ? <p className="text-sm text-[#9CA3AF]">Loading cohorts...</p> : cohorts.isError ? <div role="alert" className="text-sm text-red-600">{cohorts.error.message}<button onClick={() => void cohorts.refetch()} className="ml-2 font-semibold">Retry</button></div> : !cohorts.data?.length ? <p className="text-sm text-[#9CA3AF]">No cohort data found.</p> : <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="text-xs uppercase text-[#9CA3AF]"><tr><th className="py-2">Cohort</th><th className="py-2">Registered</th><th className="py-2">Active</th></tr></thead><tbody>{cohorts.data.map((row) => <tr key={row.cohort}><td className="py-2">{row.cohort}</td><td className="py-2">{row.totalRegistered}</td><td className="py-2">{row.activeUsersInCohort}</td></tr>)}</tbody></table></div>}</section>
-      <section className="rounded-2xl border border-[#F1F3FB] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111327]"><h3 className="mb-4 font-bold">Top Users by Vending Amount</h3>{leaderboard.isLoading ? <p className="text-sm text-[#9CA3AF]">Loading leaderboard...</p> : leaderboard.isError ? <div role="alert" className="text-sm text-red-600">{leaderboard.error.message}<button onClick={() => void leaderboard.refetch()} className="ml-2 font-semibold">Retry</button></div> : !topUsers.length ? <p className="text-sm text-[#9CA3AF]">No leaderboard users found.</p> : topUsers.map((row) => <div key={row.userId} className="flex justify-between gap-3 border-b border-[#F1F3FB] py-2 text-sm dark:border-white/10"><div><div className="font-semibold">{row.fullName}</div><div className="text-xs text-[#9CA3AF]">{row.email}</div></div><div className="text-right"><div>{fmt(row.totalAmount)}</div><div className="text-xs text-[#9CA3AF]">{row.transactionCount} transactions</div></div></div>)}</section>
+      <section className="rounded-2xl border border-line bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111327]"><h3 className="mb-4 font-bold">Cohort Analysis</h3>{cohorts.isLoading ? <p className="text-sm text-ink-muted">Loading cohorts...</p> : cohorts.isError ? <div role="alert" className="text-sm text-red-600">{cohorts.error.message}<button onClick={() => void cohorts.refetch()} className="ml-2 font-semibold">Retry</button></div> : !cohorts.data?.length ? <p className="text-sm text-ink-muted">No cohort data found.</p> : <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="text-xs uppercase text-ink-muted"><tr><th className="py-2">Cohort</th><th className="py-2">Registered</th><th className="py-2">Active</th></tr></thead><tbody>{cohorts.data.map((row) => <tr key={row.cohort}><td className="py-2">{row.cohort}</td><td className="py-2">{row.totalRegistered}</td><td className="py-2">{row.activeUsersInCohort}</td></tr>)}</tbody></table></div>}</section>
+      <section className="rounded-2xl border border-line bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111327]"><h3 className="mb-4 font-bold">Top Users by Vending Amount</h3>{leaderboard.isLoading ? <p className="text-sm text-ink-muted">Loading leaderboard...</p> : leaderboard.isError ? <div role="alert" className="text-sm text-red-600">{leaderboard.error.message}<button onClick={() => void leaderboard.refetch()} className="ml-2 font-semibold">Retry</button></div> : !topUsers.length ? <p className="text-sm text-ink-muted">No leaderboard users found.</p> : topUsers.map((row) => <div key={row.userId} className="flex justify-between gap-3 border-b border-line py-2 text-sm dark:border-white/10"><div><div className="font-semibold">{row.fullName}</div><div className="text-xs text-ink-muted">{row.email}</div></div><div className="text-right"><div>{fmt(row.totalAmount)}</div><div className="text-xs text-ink-muted">{row.transactionCount} transactions</div></div></div>)}</section>
     </div>
-    <section className="mt-4 rounded-2xl border border-[#F1F3FB] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111327]">
+    <section className="mt-4 rounded-2xl border border-line bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111327]">
       <h3 className="mb-4 font-bold">Top Performing Users in Contribution</h3>
       {topContributors.isLoading ? (
-        <p className="text-sm text-[#9CA3AF]">Loading top contributors...</p>
+        <p className="text-sm text-ink-muted">Loading top contributors...</p>
       ) : topContributors.isError ? (
         <div role="alert" className="text-sm text-red-600">
           {topContributors.error.message}
@@ -2461,11 +2533,11 @@ function ReportsSection() {
           </button>
         </div>
       ) : !topContributors.data?.length ? (
-        <p className="text-sm text-[#9CA3AF]">No top contributors found.</p>
+        <p className="text-sm text-ink-muted">No top contributors found.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="text-xs uppercase text-[#9CA3AF]">
+            <thead className="text-xs uppercase text-ink-muted">
               <tr>
                 <th className="py-2">Member</th>
                 <th className="py-2">Email</th>
@@ -2489,8 +2561,8 @@ function ReportsSection() {
         </div>
       )}
     </section>
-    <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">{(["system", "revenue", "performance"] as const).map((category) => { const values = health.data?.[category]; return <section key={category} className="rounded-2xl border border-[#F1F3FB] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111327]"><h3 className="mb-3 font-bold capitalize">{category} Health</h3>{health.isLoading ? <p className="text-sm text-[#9CA3AF]">Loading...</p> : health.isError ? <div role="alert" className="text-sm text-red-600">{health.error.message}<button onClick={() => void health.refetch()} className="ml-2 font-semibold">Retry</button></div> : values && healthFields(values).length ? healthFields(values).map(([key, value]) => <div key={key} className="flex justify-between border-b border-[#F1F3FB] py-1.5 text-xs dark:border-white/10"><span className="text-[#9CA3AF]">{key}</span><span>{String(value)}</span></div>) : <p className="text-sm text-[#9CA3AF]">No summary fields provided.</p>}</section>; })}</div>
-    {groups.isLoading ? <p className="mt-4 text-sm text-[#9CA3AF]">Loading savings group count...</p> : groups.isError ? <p role="alert" className="mt-4 text-sm text-red-600">Savings groups: {groups.error.message}<button onClick={() => void groups.refetch()} className="ml-2 font-semibold">Retry</button></p> : <p className="mt-4 text-sm text-[#6B7280] dark:text-[#94A3B8]">Savings groups: {groups.data?.length ?? 0} returned by the savings-groups API.</p>}
+    <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">{(["system", "revenue", "performance"] as const).map((category) => { const values = health.data?.[category]; return <section key={category} className="rounded-2xl border border-line bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111327]"><h3 className="mb-3 font-bold capitalize">{category} Health</h3>{health.isLoading ? <p className="text-sm text-ink-muted">Loading...</p> : health.isError ? <div role="alert" className="text-sm text-red-600">{health.error.message}<button onClick={() => void health.refetch()} className="ml-2 font-semibold">Retry</button></div> : values && healthFields(values).length ? healthFields(values).map(([key, value]) => <div key={key} className="flex justify-between border-b border-line py-1.5 text-xs dark:border-white/10"><span className="text-ink-muted">{key}</span><span>{String(value)}</span></div>) : <p className="text-sm text-ink-muted">No summary fields provided.</p>}</section>; })}</div>
+    {groups.isLoading ? <p className="mt-4 text-sm text-ink-muted">Loading savings group count...</p> : groups.isError ? <p role="alert" className="mt-4 text-sm text-red-600">Savings groups: {groups.error.message}<button onClick={() => void groups.refetch()} className="ml-2 font-semibold">Retry</button></p> : <p className="mt-4 text-sm text-ink-muted dark:text-[#94A3B8]">Savings groups: {groups.data?.length ?? 0} returned by the savings-groups API.</p>}
   </div>;
 }
 
@@ -2548,7 +2620,7 @@ function NotificationsSection() {
                 markAllAsRead.isPending ||
                 notifications.isLoading
               }
-              className="rounded-xl border border-[#E5E7EB] px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10"
+              className="rounded-xl border border-[#C9CEDF] px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10"
             >
               <CheckCheck size={16} className="mr-2 inline" />
               Mark all as read
@@ -2571,7 +2643,7 @@ function NotificationsSection() {
       />
 
       {notifications.isLoading ? (
-        <div className="rounded-2xl border border-[#F1F3FB] bg-white p-8 text-center text-sm text-[#9CA3AF] shadow-sm dark:border-white/10 dark:bg-[#111327]">
+        <div className="rounded-2xl border border-line bg-white p-8 text-center text-sm text-ink-muted shadow-sm dark:border-white/10 dark:bg-[#111327]">
           Loading notifications...
         </div>
       ) : notifications.isError ? (
@@ -2608,13 +2680,13 @@ function NotificationsSection() {
               bg="#ECFDF5"
             />
           </div>
-          <div className="overflow-hidden rounded-2xl border border-[#F1F3FB] bg-white shadow-sm dark:border-white/10 dark:bg-[#111327]">
+          <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm dark:border-white/10 dark:bg-[#111327]">
             {notifications.data.notifications.length === 0 ? (
-              <div className="p-8 text-center text-sm text-[#9CA3AF]">
+              <div className="p-8 text-center text-sm text-ink-muted">
                 You have no notifications.
               </div>
             ) : (
-              <ul className="divide-y divide-[#F1F3FB] dark:divide-white/10">
+              <ul className="divide-y divide-line dark:divide-white/10">
                 {notifications.data.notifications.map((notification) => (
                   <li
                     key={notification.id}
@@ -2628,7 +2700,7 @@ function NotificationsSection() {
                           {notification.type.replace(/_/g, " ")}
                         </span>
                         {!notification.isRead && (
-                          <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200">
+                          <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200">
                             Unread
                           </span>
                         )}
@@ -2636,7 +2708,7 @@ function NotificationsSection() {
                       <p className="text-sm text-[#4B5563] dark:text-[#CBD5E1]">
                         {notification.message}
                       </p>
-                      <p className="mt-2 text-xs text-[#9CA3AF]">
+                      <p className="mt-2 text-xs text-ink-muted">
                         {new Date(notification.createdAt).toLocaleString()}
                       </p>
                     </div>
@@ -2653,7 +2725,7 @@ function NotificationsSection() {
                               "Notification marked as read",
                             )
                           }
-                          className="rounded-lg p-2 text-[#059669] hover:bg-emerald-50 disabled:opacity-50 dark:hover:bg-emerald-950/30"
+                          className="rounded-lg p-2 text-ink-success hover:bg-emerald-50 disabled:opacity-50 dark:hover:bg-emerald-950/30"
                         >
                           <Check size={16} />
                         </button>
@@ -2747,7 +2819,7 @@ function SettingsSection() {
         subtitle="View your account and the role capabilities documented for this Admin Hub"
       />
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
+        <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-line dark:border-white/10 shadow-card">
           <h3
             style={{
               fontFamily: "var(--font-family-display, 'Bricolage Grotesque')",
@@ -2759,14 +2831,14 @@ function SettingsSection() {
             Admin Profile
           </h3>
           <div className="flex items-center gap-4 mb-5 p-4 bg-[#F9FAFB] dark:bg-white/5 rounded-xl">
-            <div className="w-14 h-14 rounded-full bg-[#EEF2FF] dark:bg-[#818CF8]/20 flex items-center justify-center text-[#3730A3] dark:text-[#818CF8] text-xl font-bold">
+            <div className="w-14 h-14 rounded-full bg-[#EEF2FF] dark:bg-[#818CF8]/20 flex items-center justify-center text-ink-primary dark:text-[#818CF8] text-xl font-bold">
               {adminInitials}
             </div>
             <div>
               <div className="font-bold text-[#0D0F1C] dark:text-[#F0F2FF]">
                 {adminName}
               </div>
-              <div className="text-sm text-[#9CA3AF]">{admin?.email || "Not available"}</div>
+              <div className="text-sm text-ink-muted">{admin?.email || "Not available"}</div>
               <Badge color="indigo">{admin?.role || "Role unavailable"}</Badge>
             </div>
           </div>
@@ -2779,7 +2851,7 @@ function SettingsSection() {
                 <input
                   value="Not available"
                   disabled
-                  className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-3 text-sm outline-none border border-transparent text-[#9CA3AF]"
+                  className="w-full bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-4 py-3 text-sm outline-none border border-transparent text-ink-muted"
                 />
               </div>
             ))}
@@ -2793,7 +2865,7 @@ function SettingsSection() {
           </div>
         </div>
         <div className="flex flex-col gap-4">
-          {canManageAdmins && <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
+          {canManageAdmins && <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-line dark:border-white/10 shadow-card">
             <h3
               style={{
                 fontFamily: "var(--font-family-display, 'Bricolage Grotesque')",
@@ -2804,7 +2876,7 @@ function SettingsSection() {
             >
               Create Admin Account
             </h3>
-            <p className="mb-4 text-sm text-[#9CA3AF]">
+            <p className="mb-4 text-sm text-ink-muted">
               Create an Admin account using the documented registration fields. The collection does not define role assignment in this request.
             </p>
             <form onSubmit={handleCreateAdmin} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -2843,7 +2915,7 @@ function SettingsSection() {
               </button>
             </form>
           </div>}
-          <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
+          <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-line dark:border-white/10 shadow-card">
             <h3
               style={{
                 fontFamily: "var(--font-family-display, 'Bricolage Grotesque')",
@@ -2854,11 +2926,11 @@ function SettingsSection() {
             >
               Notifications
             </h3>
-            <p className="text-sm text-[#9CA3AF]">
+            <p className="text-sm text-ink-muted">
               Notification preferences are not available in the documented API.
             </p>
           </div>
-          <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-[#F1F3FB] dark:border-white/10 shadow-sm">
+          <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-line dark:border-white/10 shadow-card">
             <h3
               style={{
                 fontFamily: "var(--font-family-display, 'Bricolage Grotesque')",
@@ -2869,7 +2941,7 @@ function SettingsSection() {
             >
               Documented Role Capabilities
             </h3>
-            <p className="mb-3 text-sm text-[#9CA3AF]">
+            <p className="mb-3 text-sm text-ink-muted">
               These are frontend visibility rules based on documented API scope; backend enforcement has not been verified.
             </p>
             {documentedAdminRolePolicy.map(({ role, description }) => (
@@ -2879,10 +2951,10 @@ function SettingsSection() {
               >
                 <div>
                   <span className="text-sm font-medium text-[#0D0F1C] dark:text-[#F0F2FF]">{role}</span>
-                  <p className="mt-1 text-xs text-[#9CA3AF]">{description}</p>
+                  <p className="mt-1 text-xs text-ink-muted">{description}</p>
                 </div>
                 <div className="flex gap-1.5">
-                  <button disabled title="Role permissions are not available in the documented API" className="text-xs px-2.5 py-1 bg-[#EEF2FF] dark:bg-[#818CF8]/20 text-[#3730A3] dark:text-[#818CF8] rounded-lg font-medium opacity-50 cursor-not-allowed">
+                  <button disabled title="Role permissions are not available in the documented API" className="text-xs px-2.5 py-1 bg-[#EEF2FF] dark:bg-[#818CF8]/20 text-ink-primary dark:text-[#818CF8] rounded-lg font-medium opacity-50 cursor-not-allowed">
                     Permissions unavailable
                   </button>
                   <button disabled title="Role assignment is not available in the documented API" className="text-xs px-2.5 py-1 bg-[#F1F3FB] dark:bg-white/5 text-[#374151] dark:text-gray-300 rounded-lg font-medium opacity-50 cursor-not-allowed">
@@ -3307,19 +3379,19 @@ export function AdminApp({
 
       {/* Sidebar: In-flow collapsible on tablet & large screens, off-canvas drawer on mobile */}
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-50 md:z-20 bg-white dark:bg-[#0D0F20] border-r border-[#F1F3FB] dark:border-white/10 flex flex-col transition-all duration-300 ease-in-out flex-shrink-0 ${
+        className={`fixed md:static inset-y-0 left-0 z-50 md:z-20 bg-white dark:bg-[#0D0F20] border-r border-line dark:border-white/10 flex flex-col transition-all duration-300 ease-in-out flex-shrink-0 ${
           sidebarOpen
             ? "translate-x-0 w-60 shadow-2xl md:shadow-none"
             : "-translate-x-full md:translate-x-0 md:w-16 shadow-none"
         }`}
       >
         {/* Logo and close button */}
-        <div className="p-4 flex items-center justify-between border-b border-[#F1F3FB] dark:border-white/10 min-h-[61px]">
+        <div className="p-4 flex items-center justify-between border-b border-line dark:border-white/10 min-h-[61px]">
           <div className="flex items-center gap-3 overflow-hidden">
             <img
               src="/pave_logo.png"
               alt="PAVE"
-              className="w-9 h-9 rounded-xl object-contain flex-shrink-0 shadow-sm"
+              className="w-9 h-9 rounded-xl object-contain flex-shrink-0 shadow-sm dark:bg-white dark:p-1"
             />
             {sidebarOpen && (
               <div className="min-w-0">
@@ -3334,7 +3406,7 @@ export function AdminApp({
                 >
                   PAVE
                 </div>
-                <div className="text-xs text-[#9CA3AF] mt-0.5">Admin</div>
+                <div className="text-xs text-ink-muted mt-0.5">Admin</div>
               </div>
             )}
           </div>
@@ -3371,10 +3443,17 @@ export function AdminApp({
                 title={!sidebarOpen ? item.label : undefined}
                 className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
                   active
-                    ? "bg-[#EEF2FF] dark:bg-[#818CF8]/20 text-[#3730A3] dark:text-[#818CF8] font-semibold shadow-sm"
-                    : "text-[#9CA3AF] hover:bg-[#F9FAFB] dark:hover:bg-white/5 hover:text-[#374151] dark:hover:text-[#F0F2FF]"
+                    ? "bg-[#EEF2FF] dark:bg-[#818CF8]/20 text-ink-primary dark:text-[#818CF8] font-semibold shadow-sm"
+                    : "text-ink-muted hover:bg-[#F9FAFB] dark:hover:bg-white/5 hover:text-[#374151] dark:hover:text-[#F0F2FF]"
                 } ${sidebarOpen ? "" : "justify-center px-0"}`}
               >
+                {active && (
+                  <motion.span
+                    layoutId="nav-active-bar"
+                    transition={{ type: "spring", stiffness: 500, damping: 36 }}
+                    className="absolute bottom-2 left-0 top-2 w-[3px] rounded-full bg-[#3730A3] dark:bg-[#818CF8]"
+                  />
+                )}
                 <item.icon size={19} className="flex-shrink-0" />
                 {sidebarOpen && (
                   <span
@@ -3389,7 +3468,7 @@ export function AdminApp({
                 )}
                 {item.id === "kyc" && kycQueue.length > 0 && (
                   <span
-                    className={`bg-[#DC2626] rounded-full text-white text-[10px] font-bold flex items-center justify-center ${
+                    className={`bg-[#DC2626] rounded-full text-white text-[11px] font-bold flex items-center justify-center ${
                       sidebarOpen
                         ? "ml-auto px-2 py-0.5"
                         : "absolute top-2 right-2 w-2 h-2 p-0"
@@ -3404,11 +3483,11 @@ export function AdminApp({
         </nav>
 
         {/* Sign Out */}
-        <div className="p-3 border-t border-[#F1F3FB] dark:border-white/10">
+        <div className="p-3 border-t border-line dark:border-white/10">
           <button
             onClick={handleSignOut}
             title={!sidebarOpen ? "Sign Out" : undefined}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#DC2626] hover:bg-[#FEF2F2] dark:hover:bg-[#EF4444]/15 transition-all w-full font-medium ${
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-danger hover:bg-[#FEF2F2] dark:hover:bg-[#EF4444]/15 transition-all w-full font-medium ${
               sidebarOpen ? "" : "justify-center px-0"
             }`}
           >
@@ -3421,7 +3500,7 @@ export function AdminApp({
       {/* Main Content Viewport */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full overflow-hidden">
         {/* Top Header Bar */}
-        <header className="bg-white dark:bg-[#0D0F20] border-b border-[#F1F3FB] dark:border-white/10 px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3 flex-shrink-0 z-30">
+        <header className="bg-white dark:bg-[#0D0F20] border-b border-line dark:border-white/10 px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3 flex-shrink-0 z-30">
           <div className="flex items-center gap-3 flex-1 min-w-0 max-w-lg">
             {/* Hamburger Button: Toggles sidebar on all screens (large, tablet, mobile) */}
             <button
@@ -3435,8 +3514,8 @@ export function AdminApp({
 
             {/* Global Search Input with Functional Search Dropdown */}
             <div ref={searchContainerRef} className="relative flex-1">
-              <div className="flex items-center gap-2 bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-3.5 py-2 transition-all focus-within:ring-2 focus-within:ring-[#3730A3]/20">
-                <Search size={16} className="text-[#9CA3AF] flex-shrink-0" />
+              <div className="flex items-center gap-2 bg-[#F1F3FB] dark:bg-white/5 rounded-xl px-3.5 py-2 transition-all focus-within:ring-2 focus-within:ring-[#3730A3]/40 dark:focus-within:ring-[#818CF8]/50">
+                <Search size={16} className="text-ink-muted flex-shrink-0" />
                 <input
                   value={searchQuery}
                   onChange={(e) => {
@@ -3445,7 +3524,7 @@ export function AdminApp({
                   }}
                   onFocus={() => setIsSearchFocused(true)}
                   placeholder="Search members and savings groups..."
-                  className="w-full bg-transparent text-sm outline-none text-[#0D0F1C] dark:text-[#F0F2FF] placeholder:text-[#9CA3AF]"
+                  className="w-full bg-transparent text-sm outline-none text-[#0D0F1C] dark:text-[#F0F2FF] placeholder:text-ink-muted"
                 />
                 {searchQuery && (
                   <button
@@ -3453,7 +3532,7 @@ export function AdminApp({
                       setSearchQuery("");
                       setIsSearchFocused(false);
                     }}
-                    className="text-[#9CA3AF] hover:text-foreground"
+                    className="text-ink-muted hover:text-foreground"
                   >
                     <X size={14} />
                   </button>
@@ -3467,17 +3546,17 @@ export function AdminApp({
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 6 }}
-                    className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-[#111327] rounded-2xl shadow-2xl border border-[#F1F3FB] dark:border-white/10 overflow-hidden z-50 max-h-[380px] overflow-y-auto"
+                    className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-[#111327] rounded-2xl shadow-2xl border border-line dark:border-white/10 overflow-hidden z-50 max-h-[380px] overflow-y-auto"
                   >
                     {!hasSearchResults ? (
-                      <div className="p-5 text-center text-sm text-[#9CA3AF]">
+                      <div className="p-5 text-center text-sm text-ink-muted">
                         No results found for &ldquo;{searchQuery}&rdquo;
                       </div>
                     ) : (
-                      <div className="py-2 divide-y divide-[#F9FAFB] dark:divide-white/5">
+                      <div className="py-2 divide-y divide-line dark:divide-white/10">
                         {searchResults.members.length > 0 && (
                           <div className="p-2">
-                            <div className="text-[11px] font-bold uppercase tracking-wider text-[#9CA3AF] px-3 py-1">
+                            <div className="text-xs font-bold uppercase tracking-wider text-ink-muted px-3 py-1">
                               Members ({searchResults.members.length})
                             </div>
                             {searchResults.members.map((m) => (
@@ -3492,7 +3571,7 @@ export function AdminApp({
                                 className="w-full px-3 py-2 rounded-xl flex items-center justify-between hover:bg-[#F9FAFB] dark:hover:bg-white/5 text-left transition-colors"
                               >
                                 <div className="flex items-center gap-2.5">
-                                  <div className="w-7 h-7 rounded-full bg-[#EEF2FF] dark:bg-[#818CF8]/20 text-[#3730A3] font-bold text-xs flex items-center justify-center">
+                                  <div className="w-7 h-7 rounded-full bg-[#EEF2FF] dark:bg-[#818CF8]/20 text-ink-primary font-bold text-xs flex items-center justify-center">
                                     {m.name
                                       .split(" ")
                                       .map((n) => n[0])
@@ -3502,12 +3581,12 @@ export function AdminApp({
                                     <div className="text-sm font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
                                       {m.name}
                                     </div>
-                                    <div className="text-xs text-[#9CA3AF]">
+                                    <div className="text-xs text-ink-muted">
                                       {m.email} · {m.group}
                                     </div>
                                   </div>
                                 </div>
-                                <span className="text-xs font-semibold text-[#059669]">
+                                <span className="text-xs font-semibold text-ink-success">
                                   {m.wallet === undefined ? "—" : fmt(m.wallet)}
                                 </span>
                               </button>
@@ -3517,7 +3596,7 @@ export function AdminApp({
 
                         {searchResults.programs.length > 0 && (
                           <div className="p-2">
-                            <div className="text-[11px] font-bold uppercase tracking-wider text-[#9CA3AF] px-3 py-1">
+                            <div className="text-xs font-bold uppercase tracking-wider text-ink-muted px-3 py-1">
                               Savings Programs ({searchResults.programs.length})
                             </div>
                             {searchResults.programs.map((pr) => (
@@ -3533,13 +3612,13 @@ export function AdminApp({
                                 <div className="flex items-center gap-2.5">
                                   <PiggyBank
                                     size={18}
-                                    className="text-[#D97706]"
+                                    className="text-ink-warning"
                                   />
                                   <div>
                                     <div className="text-sm font-semibold text-[#0D0F1C] dark:text-[#F0F2FF]">
                                       {pr.name}
                                     </div>
-                                    <div className="text-xs text-[#9CA3AF]">
+                                    <div className="text-xs text-ink-muted">
                                       {pr.type} · {pr.members} members
                                     </div>
                                   </div>
@@ -3568,7 +3647,7 @@ export function AdminApp({
               title={isDark ? "Switch to light mode" : "Switch to dark mode"}
             >
               {isDark ? (
-                <Sun size={17} className="text-[#D97706]" />
+                <Sun size={17} className="text-ink-warning" />
               ) : (
                 <Moon size={17} className="text-[#374151]" />
               )}
@@ -3599,10 +3678,10 @@ export function AdminApp({
           <AnimatePresence mode="wait">
             <motion.div
               key={section}
-              initial={{ opacity: 0, y: 6 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.16 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
               className="max-w-7xl mx-auto"
             >
               {renderSection()}
@@ -3649,7 +3728,7 @@ export function AdminApp({
                   Invite New Member
                 </h3>
                 <button type="button" onClick={() => setShowInviteModal(false)}>
-                  <X size={18} className="text-[#9CA3AF]" />
+                  <X size={18} className="text-ink-muted" />
                 </button>
               </div>
 
@@ -3660,7 +3739,7 @@ export function AdminApp({
                 <button
                   type="button"
                   onClick={() => setShowInviteModal(false)}
-                  className="w-full rounded-xl border-2 border-[#E5E7EB] py-2.5 text-sm font-medium text-[#374151] dark:border-white/10 dark:text-gray-300"
+                  className="w-full rounded-xl border-2 border-[#C9CEDF] py-2.5 text-sm font-medium text-[#374151] dark:border-white/10 dark:text-gray-300"
                 >
                   Close
                 </button>

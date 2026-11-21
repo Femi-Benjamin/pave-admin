@@ -44,7 +44,7 @@ export function AdminEntrySplash({ children }: AdminEntrySplashProps) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.35, duration: 0.5 }}
-              className="mt-5 text-sm font-medium tracking-wide text-white/70 sm:text-base"
+              className="mt-5 text-sm font-medium tracking-wide text-white/85 sm:text-base"
             >
               Welcome to Pave Admin Hub
             </motion.p>
