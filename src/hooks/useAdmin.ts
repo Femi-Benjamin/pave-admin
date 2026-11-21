@@ -1,9 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { adminService, auditService, notificationService } from "@/services/api";
+import {
+  adminService,
+  auditService,
+  marketService,
+  notificationService,
+} from "@/services/api";
 import type {
   CreateAdminAccountInput,
 } from "@/types";
 import type {
+  CreateAdminProductInput,
   CreateAdminSavingsGroupInput,
 } from "@/services/api";
 
@@ -532,6 +538,81 @@ export function useAdminAuditLogs(enabled = true) {
         throw new Error(response.error || response.message || "Unable to load audit logs");
       }
       return response.data;
+    },
+  });
+}
+
+const productsQueryKey = ["admin", "market", "products"] as const;
+
+export function useAdminProducts(enabled = true) {
+  return useQuery({
+    queryKey: productsQueryKey,
+    enabled,
+    queryFn: async () => {
+      const response = await marketService.getProducts();
+      if (!response.success || !response.data) {
+        throw new Error(response.error || response.message || "Unable to load products");
+      }
+      return response.data;
+    },
+  });
+}
+
+export function useAdminProductCategories(enabled = true) {
+  return useQuery({
+    queryKey: ["admin", "market", "categories"],
+    enabled,
+    queryFn: async () => {
+      const response = await marketService.getCategories();
+      if (!response.success || !response.data) {
+        throw new Error(response.error || response.message || "Unable to load categories");
+      }
+      return response.data;
+    },
+  });
+}
+
+export function useAdminPurchases(enabled = true) {
+  return useQuery({
+    queryKey: ["admin", "market", "purchases"],
+    enabled,
+    queryFn: async () => {
+      const response = await marketService.getPurchases();
+      if (!response.success || !response.data) {
+        throw new Error(response.error || response.message || "Unable to load purchases");
+      }
+      return response.data;
+    },
+  });
+}
+
+export function useCreateAdminProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CreateAdminProductInput) => {
+      const response = await marketService.createProduct(input);
+      if (!response.success || !response.data) {
+        throw new Error(response.error || response.message || "Unable to create product");
+      }
+      return response.data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: productsQueryKey });
+    },
+  });
+}
+
+export function useDeleteAdminProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (productId: string) => {
+      const response = await marketService.deleteProduct(productId);
+      if (!response.success) {
+        throw new Error(response.error || response.message || "Unable to delete product");
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: productsQueryKey });
     },
   });
 }

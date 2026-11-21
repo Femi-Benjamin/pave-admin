@@ -68,6 +68,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { AuditLogsSection } from "./AuditLogsSection";
 import { StatusPill, TransactionDetailsSheet } from "./TransactionDetailsSheet";
+import { MarketplaceSection } from "./MarketplaceSection";
 import {
   useAdminUserDetails,
   useAdminUserTransactions,
@@ -1116,7 +1117,7 @@ function MemberDetailSection({
               <Mail size={13} />
               Email
             </a>
-            <button disabled title="Messaging API is not available" className="py-2 bg-[#ECFDF5] dark:bg-[#10B981]/20 text-[#059669] dark:text-[#10B981] rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 opacity-50">
+            <button disabled title="Direct messaging from the admin hub is not connected yet" className="py-2 bg-[#ECFDF5] dark:bg-[#10B981]/20 text-[#059669] dark:text-[#10B981] rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 opacity-50">
               <MessageSquare size={13} />
               Message unavailable
             </button>
@@ -2387,26 +2388,13 @@ function AdminTransactionsSection() {
   );
 }
 
-// ─── Marketplace Section with Detailed Product Modal ─────────────────────────
-function MarketplaceSection() {
-  return <div>
-    <PageHeader title="Marketplace" subtitle="Manage products and installment listings" action={<button disabled title="Marketplace API is not available" className="px-4 py-2 bg-[#3730A3] text-white rounded-xl text-sm font-medium flex items-center gap-2 opacity-50 cursor-not-allowed"><Plus size={16} />Add Product unavailable</button>} />
-    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Product listing, inventory, and order-management endpoints are not present in the documented API collection.</div>
-    <div className="bg-white dark:bg-[#111327] rounded-2xl border border-[#F1F3FB] dark:border-white/10 overflow-hidden shadow-sm">
-      <div className="overflow-x-auto"><table className="w-full min-w-[700px]">
-        <thead className="bg-[#F9FAFB] dark:bg-white/5"><tr>{["Product", "Category", "Price", "Installment", "Stock", "Sales", "Status", ""].map((heading) => <th key={heading} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#9CA3AF]">{heading}</th>)}</tr></thead>
-        <tbody><tr><td colSpan={8} className="p-10 text-center text-sm text-[#9CA3AF]">No marketplace data available. A documented marketplace API is required to load products.</td></tr></tbody>
-      </table></div>
-    </div>
-  </div>;
-}
 function MessagingSection() {
   const [tab, setTab] = useState<"inbox" | "broadcast">("inbox");
   return <div>
     <PageHeader title="Messaging & Broadcasts" subtitle="Communicate with your members" />
     <div className="bg-white dark:bg-[#111327] rounded-2xl overflow-hidden border border-[#F1F3FB] dark:border-white/10 shadow-sm">
       <div className="flex border-b border-[#F1F3FB] dark:border-white/10">{(["inbox", "broadcast"] as const).map((item) => <button key={item} onClick={() => setTab(item)} className={`flex-1 py-3.5 text-sm font-semibold ${tab === item ? "bg-[#3730A3] text-white" : "text-[#9CA3AF] hover:bg-[#F9FAFB] dark:hover:bg-white/5"}`}>{item === "inbox" ? <><MessageSquare size={15} className="inline mr-2" />Inbox</> : <><Megaphone size={15} className="inline mr-2" />Broadcast</>}</button>)}</div>
-      {tab === "inbox" ? <div className="p-12 text-center text-sm text-[#9CA3AF]">Messaging is unavailable because the documented API collection has no inbox or messaging endpoints.</div> : <div className="p-5"><div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Broadcast delivery is unavailable because the documented API collection has no broadcast endpoint.</div><div className="flex max-w-2xl flex-col gap-4"><label className="text-xs font-medium">Send To<select disabled className="mt-1.5 w-full rounded-xl bg-[#F1F3FB] px-4 py-3 text-sm"><option>Recipients unavailable</option></select></label><label className="text-xs font-medium">Subject<input disabled placeholder="Subject" className="mt-1.5 w-full rounded-xl bg-[#F1F3FB] px-4 py-3 text-sm" /></label><label className="text-xs font-medium">Message<textarea disabled rows={6} placeholder="Broadcast message" className="mt-1.5 w-full resize-none rounded-xl bg-[#F1F3FB] px-4 py-3 text-sm" /></label><div className="flex gap-3"><button disabled className="rounded-xl border-2 border-[#E5E7EB] px-5 py-2.5 text-sm opacity-50">Schedule unavailable</button><button disabled className="flex items-center gap-2 rounded-xl bg-[#3730A3] px-6 py-2.5 text-sm font-semibold text-white opacity-50"><Send size={15} />Send unavailable</button></div></div></div>}
+      {tab === "inbox" ? <div className="p-12 text-center text-sm text-[#9CA3AF]">The admin inbox is not connected yet. The API documents group-chat and one-to-one chat routes, but they have not been confirmed for admin accounts, so this screen stays read-only until access is verified.</div> : <div className="p-5"><div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Broadcasting is not available: the API documents chat routes but no broadcast endpoint, so messages cannot be sent to a whole cohort from here.</div><div className="flex max-w-2xl flex-col gap-4"><label className="text-xs font-medium">Send To<select disabled className="mt-1.5 w-full rounded-xl bg-[#F1F3FB] px-4 py-3 text-sm"><option>Recipients unavailable</option></select></label><label className="text-xs font-medium">Subject<input disabled placeholder="Subject" className="mt-1.5 w-full rounded-xl bg-[#F1F3FB] px-4 py-3 text-sm" /></label><label className="text-xs font-medium">Message<textarea disabled rows={6} placeholder="Broadcast message" className="mt-1.5 w-full resize-none rounded-xl bg-[#F1F3FB] px-4 py-3 text-sm" /></label><div className="flex gap-3"><button disabled className="rounded-xl border-2 border-[#E5E7EB] px-5 py-2.5 text-sm opacity-50">Schedule unavailable</button><button disabled className="flex items-center gap-2 rounded-xl bg-[#3730A3] px-6 py-2.5 text-sm font-semibold text-white opacity-50"><Send size={15} />Send unavailable</button></div></div></div>}
     </div>
   </div>;
 }

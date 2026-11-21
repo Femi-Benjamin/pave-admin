@@ -66,10 +66,12 @@ async function requestApi(
 
   try {
     const token = getStoredToken();
+    // Multipart bodies need the browser to set the Content-Type (with boundary).
+    const isFormData = typeof FormData !== "undefined" && options?.body instanceof FormData;
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers: {
-        "Content-Type": "application/json",
+        ...(isFormData ? {} : { "Content-Type": "application/json" }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options?.headers,
       },
@@ -1074,6 +1076,178 @@ export const auditService = {
       .filter((log): log is AdminAuditLog => log !== undefined)
       .sort((a, b) => Date.parse(b.createdAt || "") - Date.parse(a.createdAt || "") || 0);
     return { ...response, data: logs };
+  },
+};
+
+// ─── Marketplace ──────────────────────────────────────────────────────────────
+// Only operations the collection documents with a usable URL and method are
+// wired: category list, product list/create/delete and the purchase list.
+// Category writes (blank URL, GET methods), product update (inconsistent auth
+// and image field) and purchase mutations (buyer-side) are intentionally left out.
+
+export interface AdminProductCategory {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface AdminProduct {
+  id: string;
+  categoryId: string;
+  name: string;
+  description: string;
+  price: number;
+  quantity: number;
+  status: string;
+  rating: number;
+  imageUrl?: string;
+  createdAt: string;
+}
+
+export interface AdminPurchase {
+  id: string;
+  productId: string;
+  productName: string;
+  buyerName: string;
+  buyerEmail: string;
+  quantity: number;
+  totalPrice: number;
+  totalAmountPaid: number;
+  totalAmountDue: number;
+  percentage: number;
+  status: string;
+  createdAt: string;
+}
+
+export interface CreateAdminProductInput {
+  categoryId: string;
+  productName: string;
+  description: string;
+  price: number;
+  quantity: number;
+  productRating?: number;
+  image?: File;
+}
+
+const toNumber = (value: unknown): number => {
+  const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  return Number.isFinite(n) ? n : 0;
+};
+
+function extractRows(data: unknown): unknown[] | undefined {
+  if (Array.isArray(data)) return data;
+  if (isRecord(data)) return [data.rows, data.data, data.items].find(Array.isArray);
+  return undefined;
+}
+
+function mapCategory(value: unknown): AdminProductCategory | undefined {
+  if (!isRecord(value)) return undefined;
+  const id = str(value.id);
+  const name = str(value.categoryName) ?? str(value.name);
+  if (!id || !name) return undefined;
+  return { id, name, description: str(value.description) ?? "" };
+}
+
+function mapProduct(value: unknown): AdminProduct | undefined {
+  if (!isRecord(value)) return undefined;
+  const id = str(value.id);
+  const name = str(value.productName) ?? str(value.name);
+  if (!id || !name) return undefined;
+  return {
+    id,
+    categoryId: str(value.categoryId) ?? "",
+    name,
+    description: str(value.description) ?? "",
+    price: toNumber(value.price),
+    quantity: toNumber(value.quantity),
+    status: str(value.status) ?? "unknown",
+    rating: toNumber(value.productRating),
+    imageUrl: str(value.productImage),
+    createdAt: str(value.createdAt) ?? "",
+  };
+}
+
+function mapPurchase(value: unknown): AdminPurchase | undefined {
+  if (!isRecord(value)) return undefined;
+  const id = str(value.id);
+  if (!id) return undefined;
+  const user = isRecord(value.user) ? value.user : {};
+  const product = isRecord(value.product) ? value.product : {};
+  return {
+    id,
+    productId: str(value.productId) ?? "",
+    productName: str(product.productName) ?? "Unknown product",
+    buyerName:
+      [str(user.firstName), str(user.lastName)].filter(Boolean).join(" ") || "Unknown buyer",
+    buyerEmail: str(user.email) ?? "",
+    quantity: toNumber(value.quantity),
+    totalPrice: toNumber(value.totalPrice),
+    totalAmountPaid: toNumber(value.totalAmountPaid),
+    totalAmountDue: toNumber(value.totalAmountDue),
+    percentage: toNumber(value.percentage),
+    status: str(value.purchaseStatus) ?? "unknown",
+    createdAt: str(value.createdAt) ?? "",
+  };
+}
+
+async function listFrom<T>(
+  endpoint: string,
+  label: string,
+  mapper: (value: unknown) => T | undefined,
+): Promise<ApiResponse<T[]>> {
+  const response = await apiFetch<unknown>(endpoint);
+  if (!response.success) return failedResponse<T[]>(response);
+  const rows = extractRows(response.data);
+  if (!rows) {
+    return { success: false, error: `The ${label} response did not contain a list.` };
+  }
+  return {
+    ...response,
+    data: rows.map(mapper).filter((row): row is T => row !== undefined),
+  };
+}
+
+export const marketService = {
+  getCategories(): Promise<ApiResponse<AdminProductCategory[]>> {
+    return listFrom("/api/v1/category/getAllCategory", "categories", mapCategory);
+  },
+
+  getProducts(): Promise<ApiResponse<AdminProduct[]>> {
+    return listFrom("/api/v1/product/get-all-products", "products", mapProduct);
+  },
+
+  getPurchases(): Promise<ApiResponse<AdminPurchase[]>> {
+    return listFrom("/api/v1/product/get-all-purchase", "purchases", mapPurchase);
+  },
+
+  async createProduct(input: CreateAdminProductInput): Promise<ApiResponse<AdminProduct>> {
+    const form = new FormData();
+    form.append("productName", input.productName);
+    form.append("description", input.description);
+    form.append("price", String(input.price));
+    form.append("quantity", String(input.quantity));
+    if (input.productRating !== undefined) form.append("productRating", String(input.productRating));
+    if (input.image) form.append("productImage", input.image);
+    const response = await apiFetch<unknown>(
+      `/api/v1/product/create-product/${encodeURIComponent(input.categoryId)}`,
+      { method: "POST", body: form },
+    );
+    if (!response.success) return failedResponse<AdminProduct>(response);
+    const product = mapProduct(response.data);
+    if (!product) {
+      return { success: false, error: "The create-product response did not match the documented shape." };
+    }
+    return { ...response, data: product };
+  },
+
+  async deleteProduct(productId: string): Promise<ApiResponse<null>> {
+    const response = await apiFetch<unknown>(
+      `/api/v1/product/delete-product/${encodeURIComponent(productId)}`,
+      { method: "DELETE" },
+    );
+    return response.success
+      ? { success: true, data: null, message: response.message }
+      : failedResponse<null>(response);
   },
 };
 

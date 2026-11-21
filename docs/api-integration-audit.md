@@ -29,9 +29,9 @@ No convincing mock member, transaction, KYC, notification, or analytics datasets
 | Savings | group list and create | Matches two group-saving endpoints. No group update/delete/detail or personal-saving/contribution calls. |
 | Notifications | list, mark one/all read, delete one/all | Paths/methods match. Postman calls them user notifications; confirm they are appropriate for admin tokens. |
 | Wallets | wallet aggregate and user/role dataset | No admin wallet list, per-user ledger, daily credit/debit aggregate, or export API is documented. Some metrics are explicitly unavailable; “Export Ledger” is enabled but has no handler. |
-| Marketplace | no service calls or hooks | Missing integration despite documented category/product/purchase endpoints; UI disables Add Product as “API unavailable.” |
-| Messaging | no service calls or hooks | Missing integration despite documented group and one-to-one chat routes; UI incorrectly says none are documented. Broadcast/admin inbox suitability is unverified. |
-| Audit logs | no service calls or screen | `GET /api/v1/audit/audit-logs` is documented but not consumed. |
+| Marketplace | **Updated:** category list, product list/create/delete, purchase list | Wired via `marketService`. Not wired on purpose: category create/update/delete (blank URLs, GET methods in the collection), product update (basic auth and an `images` field that disagrees with create), and buyer-side purchase mutations. Admin authorization for these routes is still unconfirmed. |
+| Messaging | no service calls or hooks | Copy corrected: the UI no longer claims no endpoints are documented. Chat routes are not wired until admin access is confirmed; no broadcast endpoint is documented. |
+| Audit logs | **Updated:** `auditService.getLogs` and `AuditLogsSection` | Wired. The collection has no sample response, so the parser is tolerant and keeps the raw record. |
 | Settings/profile | admin creation and role listing | No admin profile update, role assignment/permission, notification-preference, or logout endpoint is documented. Related controls are disabled. |
 
 ## Findings
