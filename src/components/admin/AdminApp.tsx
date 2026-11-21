@@ -67,7 +67,7 @@ import {
 } from "recharts";
 import { useAuth } from "@/hooks/useAuth";
 import { AuditLogsSection } from "./AuditLogsSection";
-import { StatusPill, TransactionDetailsSheet } from "./TransactionDetailsSheet";
+import { StatusPill, TransactionDetailsDialog } from "./TransactionDetailsDialog";
 import { WalletDetailsDialog } from "./WalletDetailsDialog";
 import { MarketplaceSection } from "./MarketplaceSection";
 import {
@@ -2370,7 +2370,7 @@ function AdminTransactionsSection() {
         </p>
       )}
 
-      <TransactionDetailsSheet
+      <TransactionDetailsDialog
         transaction={transactionDetails}
         userName={detailUserLabel}
         userEmail={detailUser?.email}

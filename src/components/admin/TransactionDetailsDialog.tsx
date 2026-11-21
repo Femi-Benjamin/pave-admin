@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Check, ChevronDown, Copy, Zap } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/sonner";
 import type { AdminTransaction } from "@/types";
 
@@ -113,7 +113,7 @@ function Row({
 
 const groupDigits = (token: string) => token.replace(/\s+/g, "").replace(/(.{4})/g, "$1 ").trim();
 
-export function TransactionDetailsSheet({
+export function TransactionDetailsDialog({
   transaction,
   userName,
   userEmail,
@@ -195,23 +195,22 @@ export function TransactionDetailsSheet({
     : [];
 
   return (
-    <Sheet open={!!t} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent
-        side="right"
+    <Dialog open={!!t} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
         onOpenAutoFocus={(event) => event.preventDefault()}
-        className="flex w-full flex-col gap-0 border-l border-[#E5E7EB] bg-[#F9FAFB] p-0 sm:max-w-[460px] dark:border-white/10 dark:bg-[#0D0F20]"
+        className="flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-xl flex-col gap-0 overflow-hidden rounded-3xl border-white/10 bg-white p-0 dark:bg-[#111327]"
       >
         {t && (
           <>
-            <header className="border-b border-[#F1F3FB] bg-white px-6 pb-6 pt-6 dark:border-white/10 dark:bg-[#111327]">
-              <SheetTitle className="text-xs font-semibold uppercase tracking-wider text-[#9CA3AF]">
+            <header className="shrink-0 border-b border-[#F1F3FB] px-6 pb-5 pt-6 pr-12 dark:border-white/10">
+              <DialogTitle className="text-xs font-semibold uppercase tracking-wider text-[#9CA3AF]">
                 Transaction details
-              </SheetTitle>
-              <SheetDescription className="sr-only">
+              </DialogTitle>
+              <DialogDescription className="sr-only">
                 Full breakdown for transaction {t.reference}
-              </SheetDescription>
+              </DialogDescription>
               <div
-                className="mt-4 text-4xl font-bold tracking-tight text-[#0D0F1C] dark:text-[#F0F2FF]"
+                className="mt-3 text-4xl font-bold tracking-tight text-[#0D0F1C] dark:text-[#F0F2FF]"
                 style={{ fontFamily: "var(--font-family-display, 'Bricolage Grotesque')" }}
               >
                 {money(t.amount) ?? "—"}
@@ -227,7 +226,7 @@ export function TransactionDetailsSheet({
               )}
             </header>
 
-            <div className="admin-dialog-scrollbar min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-6 py-5">
+            <div className="admin-dialog-scrollbar min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain bg-[#F9FAFB] px-6 py-5 dark:bg-[#0D0F20]">
               {isRefreshing && (
                 <p className="text-xs text-[#9CA3AF]">Refreshing latest details…</p>
               )}
@@ -353,7 +352,7 @@ export function TransactionDetailsSheet({
             </div>
           </>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
