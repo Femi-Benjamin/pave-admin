@@ -170,7 +170,7 @@ export function WalletDetailsDialog({
                   </h3>
                   <span className="text-xs text-[#9CA3AF]">{transactions.data?.length ?? 0} transactions</span>
                 </div>
-                <div className="space-y-2">
+                <div className="admin-dialog-scrollbar max-h-[19rem] space-y-2 overflow-y-auto overscroll-contain pr-1">
                   {transactions.isLoading ? (
                     <p className="py-4 text-center text-sm text-[#9CA3AF]">Loading user transactions…</p>
                   ) : transactions.isError ? (
