@@ -67,6 +67,7 @@ import {
 } from "recharts";
 import { useAuth } from "@/hooks/useAuth";
 import { AuditLogsSection } from "./AuditLogsSection";
+import { StatusPill, TransactionDetailsSheet } from "./TransactionDetailsSheet";
 import {
   useAdminUserDetails,
   useAdminUserTransactions,
@@ -100,13 +101,6 @@ import {
   useDeleteAdminNotification,
   useDeleteAllAdminNotifications,
 } from "@/hooks/useAdmin";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import type {
   AdminDailyRegistration,
   AdminSavingsGroup,
@@ -1960,12 +1954,12 @@ function WalletsSection({
                   "This Month Out",
                   "Last Activity",
                   "",
-                ].map((h) => (
+                ].map((h, i) => (
                   <th
-                    key={h}
+                    key={h || i}
                     className="text-left px-4 py-3 text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider"
                   >
-                    {h}
+                    {h || <span className="sr-only">Open</span>}
                   </th>
                 ))}
               </tr>
@@ -1982,8 +1976,16 @@ function WalletsSection({
               ) : members.map((m) => (
                 <tr
                   key={m.id}
+                  tabIndex={0}
+                  aria-label={`View wallet details for ${m.name}`}
                   onClick={() => onSelectMember(m)}
-                  className="hover:bg-[#F9FAFB] dark:hover:bg-white/5 cursor-pointer transition-colors group"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onSelectMember(m);
+                    }
+                  }}
+                  className="group cursor-pointer transition-colors hover:bg-[#F5F6FF] focus-visible:bg-[#F5F6FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#3730A3] dark:hover:bg-white/5 dark:focus-visible:bg-white/5"
                 >
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-2.5">
@@ -2012,9 +2014,11 @@ function WalletsSection({
                     Not available from the user-role API
                   </td>
                   <td className="px-4 py-3.5 text-right">
-                    <span className="text-xs font-semibold text-[#3730A3] dark:text-[#818CF8] group-hover:underline">
-                      View Details →
-                    </span>
+                    <ChevronRight
+                      size={16}
+                      aria-hidden="true"
+                      className="inline text-[#9CA3AF] transition-transform group-hover:translate-x-0.5 group-hover:text-[#3730A3]"
+                    />
                   </td>
                 </tr>
               ))}
@@ -2070,7 +2074,9 @@ function AdminTransactionsSection() {
     return userById.get(transactionUserId);
   };
 
-  const transactionDetails = transactionDetailsQuery.data ?? selectedTransaction;
+  const transactionDetails = selectedTransaction
+    ? (transactionDetailsQuery.data ?? selectedTransaction)
+    : null;
   const detailUser = transactionDetails
     ? getUser(transactionDetails.userId)
     : undefined;
@@ -2105,7 +2111,19 @@ function AdminTransactionsSection() {
     const transactionId = transaction._id;
 
     return (
-      <tr key={transactionId}>
+      <tr
+        key={transactionId}
+        tabIndex={0}
+        aria-label={`View transaction ${transaction.reference}`}
+        onClick={() => setSelectedTransaction(transaction)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setSelectedTransaction(transaction);
+          }
+        }}
+        className="group cursor-pointer transition-colors hover:bg-[#F5F6FF] focus-visible:bg-[#F5F6FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#3730A3] dark:hover:bg-white/5 dark:focus-visible:bg-white/5"
+      >
         <td className="px-4 py-3 text-sm">
           <div className="font-medium text-[#0D0F1C] dark:text-[#F0F2FF]">
             {displayName}
@@ -2121,17 +2139,18 @@ function AdminTransactionsSection() {
         <td className="px-4 py-3 text-sm font-semibold">
           {fmt(Number(transaction.amount))}
         </td>
-        <td className="px-4 py-3 text-sm">{transaction.status}</td>
+        <td className="px-4 py-3 text-sm">
+          <StatusPill status={transaction.status} />
+        </td>
         <td className="px-4 py-3 text-xs text-[#6B7280] dark:text-[#94A3B8]">
           {new Date(transaction.createdAt).toLocaleString()}
         </td>
-        <td className="px-4 py-3">
-          <button
-            onClick={() => setSelectedTransaction(transaction)}
-            className="text-xs font-semibold text-[#3730A3] hover:underline dark:text-[#818CF8]"
-          >
-            View
-          </button>
+        <td className="w-10 px-4 py-3 text-right">
+          <ChevronRight
+            size={16}
+            aria-hidden="true"
+            className="inline text-[#9CA3AF] transition-transform group-hover:translate-x-0.5 group-hover:text-[#3730A3]"
+          />
         </td>
       </tr>
     );
@@ -2247,7 +2266,7 @@ function AdminTransactionsSection() {
                     <th className="px-4 py-2">Amount</th>
                     <th className="px-4 py-2">Status</th>
                     <th className="px-4 py-2">Date</th>
-                    <th className="px-4 py-2">Details</th>
+                    <th className="w-10 px-4 py-2"><span className="sr-only">Open</span></th>
                   </tr>
                 </thead>
                 <tbody>{searchedTransactions.map(renderTransactionRow)}</tbody>
@@ -2320,7 +2339,7 @@ function AdminTransactionsSection() {
                   <th className="px-4 py-3">Amount</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Details</th>
+                  <th className="w-10 px-4 py-3"><span className="sr-only">Open</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1F3FB] dark:divide-white/5">
@@ -2349,119 +2368,21 @@ function AdminTransactionsSection() {
         </p>
       )}
 
-      <Dialog
-        open={!!selectedTransaction}
-        onOpenChange={(open) => {
-          if (!open) setSelectedTransaction(null);
-        }}
-      >
-        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl flex-col overflow-hidden border-[#D7DCE5] bg-white text-[#111827] shadow-2xl dark:border-white/15 dark:bg-[#111827] dark:text-[#F9FAFB]">
-          <DialogHeader className="shrink-0 pr-6">
-            <DialogTitle className="text-[#111827] dark:text-[#F9FAFB]">
-              Transaction Details
-            </DialogTitle>
-            <DialogDescription className="break-all text-[#4B5563] dark:text-[#D1D5DB]">
-              {transactionDetails?.reference ??
-                "Full details for the selected transaction"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="admin-dialog-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-2">
-            {transactionDetailsQuery.isLoading && (
-              <p className="text-sm text-[#9CA3AF]">Loading additional transaction details...</p>
-            )}
-            {transactionDetailsQuery.isError && (
-              <div role="alert" className="text-sm text-red-600">
-                {transactionDetailsQuery.error instanceof Error
-                  ? transactionDetailsQuery.error.message
-                  : "Unable to load transaction details"}
-                <button
-                  onClick={() => void transactionDetailsQuery.refetch()}
-                  className="ml-3 font-semibold underline"
-                >
-                  Retry
-                </button>
-              </div>
-            )}
-            {transactionDetails && (
-              <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                {[
-                  ["ID", transactionDetails._id],
-                  ["Reference", transactionDetails.reference],
-                  ["Amount", fmt(Number(transactionDetails.amount))],
-                  ["Status", transactionDetails.status],
-                  ["Meter number", transactionDetails.meterNumber || "—"],
-                  ["Meter account number", transactionDetails.meterAccountNumber || "—"],
-                  ["Description", transactionDetails.description || "—"],
-                  ["Vend type", transactionDetails.vendType || "—"],
-                  ["Subclass", transactionDetails.subclass || "—"],
-                  ["Tariff", transactionDetails.tariff || "—"],
-                  [
-                    "Units",
-                    transactionDetails.unitsActual === undefined
-                      ? "—"
-                      : `${transactionDetails.unitsActual} ${transactionDetails.unitName || ""}`.trim(),
-                  ],
-                  [
-                    "Transaction fees",
-                    transactionDetails.transactionFees === undefined
-                      ? "—"
-                      : fmt(transactionDetails.transactionFees),
-                  ],
-                  [
-                    "Vendor transaction fees",
-                    transactionDetails.vendorTransactionFees === undefined
-                      ? "—"
-                      : fmt(transactionDetails.vendorTransactionFees),
-                  ],
-                  [
-                    "Client transaction fees",
-                    transactionDetails.clientTransactionFees === undefined
-                      ? "—"
-                      : fmt(transactionDetails.clientTransactionFees),
-                  ],
-                  [
-                    "VAT",
-                    transactionDetails.vat === undefined
-                      ? "—"
-                      : fmt(transactionDetails.vat),
-                  ],
-                  ["Token (hex)", transactionDetails.tokenHex || "—"],
-                  ["Token (decimal)", transactionDetails.tokenDec || "—"],
-                  [
-                    "Vend time",
-                    transactionDetails.vendTime
-                      ? new Date(transactionDetails.vendTime).toLocaleString()
-                      : "—",
-                  ],
-                  [
-                    "Created",
-                    new Date(transactionDetails.createdAt).toLocaleString(),
-                  ],
-                  [
-                    "Updated",
-                    transactionDetails.updatedAt
-                      ? new Date(transactionDetails.updatedAt).toLocaleString()
-                      : "—",
-                  ],
-                  ["User", detailUserLabel],
-                ].map(([label, value]) => (
-                  <div
-                    key={label}
-                    className="min-w-0 rounded-xl border border-[#DDE2EA] bg-[#F3F5F9] p-3 shadow-sm dark:border-white/15 dark:bg-[#202438]"
-                  >
-                    <dt className="text-xs font-semibold text-[#4B5563] dark:text-[#D1D5DB]">
-                      {label}
-                    </dt>
-                    <dd className="mt-1 break-all font-semibold leading-5 text-[#111827] dark:text-[#F9FAFB]">
-                      {value}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <TransactionDetailsSheet
+        transaction={transactionDetails}
+        userName={detailUserLabel}
+        userEmail={detailUser?.email}
+        isRefreshing={transactionDetailsQuery.isFetching}
+        error={
+          transactionDetailsQuery.isError
+            ? transactionDetailsQuery.error instanceof Error
+              ? transactionDetailsQuery.error.message
+              : "Unable to load transaction details"
+            : null
+        }
+        onRetry={() => void transactionDetailsQuery.refetch()}
+        onClose={() => setSelectedTransaction(null)}
+      />
     </div>
   );
 }
