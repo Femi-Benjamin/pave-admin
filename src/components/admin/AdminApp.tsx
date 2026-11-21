@@ -942,12 +942,12 @@ function MembersSection({
                   "KYC",
                   "Status",
                   "",
-                ].map((h) => (
+                ].map((h, i) => (
                   <th
-                    key={h}
+                    key={h || i}
                     className="text-left px-4 py-3 text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider"
                   >
-                    {h}
+                    {h || <span className="sr-only">Open</span>}
                   </th>
                 ))}
               </tr>
@@ -956,7 +956,20 @@ function MembersSection({
               {visibleMembers.map((m) => (
                 <tr
                   key={m.id}
-                  className="hover:bg-[#F9FAFB] dark:hover:bg-white/5 transition-colors"
+                  tabIndex={0}
+                  aria-label={`View details for ${m.name}`}
+                  onClick={() => {
+                    setSelectedMember(m);
+                    onNav("member-detail");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setSelectedMember(m);
+                      onNav("member-detail");
+                    }
+                  }}
+                  className="group cursor-pointer transition-colors hover:bg-[#F5F6FF] focus-visible:bg-[#F5F6FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#3730A3] dark:hover:bg-white/5 dark:focus-visible:bg-white/5"
                 >
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-3">
@@ -995,16 +1008,12 @@ function MembersSection({
                       {m.status}
                     </Badge>
                   </td>
-                  <td className="px-4 py-3.5 text-right">
-                    <button
-                      onClick={() => {
-                        setSelectedMember(m);
-                        onNav("member-detail");
-                      }}
-                      className="text-[#3730A3] dark:text-[#818CF8] text-xs font-semibold hover:underline"
-                    >
-                      View
-                    </button>
+                  <td className="w-10 px-4 py-3.5 text-right">
+                    <ChevronRight
+                      size={16}
+                      aria-hidden="true"
+                      className="inline text-[#9CA3AF] transition-transform group-hover:translate-x-0.5 group-hover:text-[#3730A3]"
+                    />
                   </td>
                 </tr>
               ))}
