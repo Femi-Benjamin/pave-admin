@@ -68,6 +68,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { AuditLogsSection } from "./AuditLogsSection";
 import { StatusPill, TransactionDetailsSheet } from "./TransactionDetailsSheet";
+import { WalletDetailsDialog } from "./WalletDetailsDialog";
 import { MarketplaceSection } from "./MarketplaceSection";
 import {
   useAdminUserDetails,
@@ -3130,6 +3131,11 @@ export function AdminApp({
 
   const handleBlockUser = async () => {
     if (!selectedWalletMember) return;
+    const isBlocked =
+      userDetailsQuery.data?.isBlocked ||
+      userDetailsQuery.data?.status.toLowerCase() === "blocked";
+    const action = isBlocked ? "unblock" : "block";
+    if (!window.confirm(`Are you sure you want to ${action} ${selectedWalletMember.email}?`)) return;
 
     try {
       const result = await blockUserMutation.mutateAsync(
@@ -3138,7 +3144,7 @@ export function AdminApp({
       toast.success(result.statusMessage || "User status updated");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Unable to block user",
+        error instanceof Error ? error.message : "Unable to update user",
       );
     }
   };
@@ -3598,6 +3604,15 @@ export function AdminApp({
 
       {/* Product Edit & Detail Modal */}
       {/* Global Invite Member Modal */}
+      <WalletDetailsDialog
+        member={selectedWalletMember}
+        details={userDetailsQuery}
+        transactions={userTransactionsQuery}
+        isTogglingBlock={blockUserMutation.isPending}
+        onToggleBlock={() => void handleBlockUser()}
+        onClose={() => setSelectedWalletMember(null)}
+      />
+
       <AnimatePresence>
         {showInviteModal && (
           <motion.div

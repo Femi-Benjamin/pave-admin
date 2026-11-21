@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
-import { Check, Copy, Zap } from "lucide-react";
+import { Check, ChevronDown, Copy, Zap } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "@/components/ui/sonner";
 import type { AdminTransaction } from "@/types";
@@ -162,6 +163,36 @@ export function TransactionDetailsSheet({
   const shownMeter = meterRows.filter(([, v]) => present(v));
   const shownFees = feeRows.filter(([, v]) => present(v));
   const token = t?.tokenDec || t?.tokenHex;
+  const [showAll, setShowAll] = useState(false);
+
+  // Every field the API can return, shown in full (including empty ones) for
+  // anyone who needs the raw record rather than the summary above.
+  const allFields: [string, string | number | undefined, boolean?][] = t
+    ? [
+        ["ID", t._id, true],
+        ["Reference", t.reference, true],
+        ["Type", t.type],
+        ["Amount", money(t.amount) ?? undefined],
+        ["Status", t.status],
+        ["Meter number", t.meterNumber],
+        ["Meter account number", t.meterAccountNumber],
+        ["Description", t.description],
+        ["Vend type", t.vendType],
+        ["Subclass", t.subclass],
+        ["Tariff", t.tariff],
+        ["Units", present(t.unitsActual) ? `${t.unitsActual} ${t.unitName || ""}`.trim() : undefined],
+        ["Transaction fees", money(t.transactionFees) ?? undefined],
+        ["Vendor transaction fees", money(t.vendorTransactionFees) ?? undefined],
+        ["Client transaction fees", money(t.clientTransactionFees) ?? undefined],
+        ["VAT", money(t.vat) ?? undefined],
+        ["Token (hex)", t.tokenHex, true],
+        ["Token (decimal)", t.tokenDec, true],
+        ["Vend time", dateTime(t.vendTime) ?? undefined],
+        ["Created", dateTime(t.createdAt) ?? undefined],
+        ["Updated", dateTime(t.updatedAt) ?? undefined],
+        ["User ID", typeof t.userId === "string" ? t.userId : t.userId?._id, true],
+      ]
+    : [];
 
   return (
     <Sheet open={!!t} onOpenChange={(open) => !open && onClose()}>
@@ -285,6 +316,40 @@ export function TransactionDetailsSheet({
                 <Row label="Reference" value={t.reference} mono copy={t.reference} />
                 {present(t._id) && <Row label="Transaction ID" value={t._id} mono copy={t._id} />}
               </Section>
+
+              <Collapsible open={showAll} onOpenChange={setShowAll}>
+                <CollapsibleTrigger className="group flex w-full items-center justify-between rounded-2xl border border-[#E5E7EB] bg-white px-4 py-3 text-sm font-semibold text-[#3730A3] transition-colors hover:bg-[#F5F6FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3730A3] dark:border-white/10 dark:bg-white/[0.03] dark:text-[#818CF8] dark:hover:bg-white/5">
+                  <span>
+                    {showAll ? "Hide all details" : "View all details"}
+                    <span className="ml-2 text-xs font-medium text-[#9CA3AF]">
+                      {allFields.length} fields
+                    </span>
+                  </span>
+                  <ChevronDown
+                    size={16}
+                    className={`transition-transform duration-200 ${showAll ? "rotate-180" : ""}`}
+                  />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2 overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                  <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {allFields.map(([label, value, mono]) => (
+                      <div
+                        key={label}
+                        className="min-w-0 rounded-xl border border-[#F1F3FB] bg-white px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.03]"
+                      >
+                        <dt className="text-[11px] font-medium text-[#9CA3AF]">{label}</dt>
+                        <dd
+                          className={`mt-0.5 break-all text-sm font-medium text-[#0D0F1C] dark:text-[#F0F2FF] ${
+                            mono ? "font-mono text-xs" : ""
+                          }`}
+                        >
+                          {present(value) ? String(value) : <span className="text-[#9CA3AF]">—</span>}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </CollapsibleContent>
+              </Collapsible>
             </div>
           </>
         )}
