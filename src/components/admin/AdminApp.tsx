@@ -263,7 +263,8 @@ function isAdminTransaction(value: unknown): value is AdminTransaction {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-const fmt = (n: number) => `₦${n.toLocaleString()}`;
+const fmt = (n: number) =>
+  `₦${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 const pct = (a: number, b: number) => Math.min(100, Math.round((a / b) * 100));
 
 // ─── Shared UI Components ────────────────────────────────────────────────────
@@ -2026,9 +2027,9 @@ function WalletsSection({
             </p>
           </div>
         </div>
-        <div className="overflow-x-auto">
+        <div className="max-h-[min(65vh,620px)] overflow-auto overscroll-contain">
           <table className="w-full min-w-[650px]">
-            <thead className="bg-[#F9FAFB] dark:bg-white/5">
+            <thead className="sticky top-0 z-10 bg-[#F9FAFB] shadow-[0_1px_0_0_hsl(var(--line))] dark:bg-[#17192F]">
               <tr>
                 {[
                   "Member",
