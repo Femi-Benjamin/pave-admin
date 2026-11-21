@@ -31,13 +31,24 @@
     --secondary-foreground: 262 83% 45%;
     
     --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
-    
+    --muted-foreground: 220 10% 38%;
+
     --accent: 262 30% 93%;
     --accent-foreground: 262 83% 45%;
-    
+
+    /* Readable "ink" colors for text on light surfaces (all >= 4.5:1, WCAG AA) */
+    --ink-muted: 220 14% 39%;
+    --ink-primary: 243 57% 42%;
+    --ink-success: 162 94% 24%;
+    --ink-warning: 26 90% 37%;
+    --ink-danger: 0 74% 42%;
+    --ink-purple: 263 70% 50%;
+
+    /* Visible-but-quiet divider for cards and tables */
+    --line: 226 26% 88%;
+
     /* Status colors */
-    --destructive: 0 84% 60%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
     
     --success: 142 76% 36%;
@@ -56,9 +67,9 @@
     --pending-foreground: 0 0% 100%;
     --pending-light: 262 60% 95%;
     
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 262 83% 58%;
+    --border: 226 26% 88%;
+    --input: 224 20% 82%;
+    --ring: 243 75% 59%;
     
     --radius: 0.75rem;
     
@@ -80,11 +91,11 @@
     --chart-5: 340 75% 55%;
     
     /* Shadows and effects */
-    --shadow-sm: 0 1px 2px 0 hsl(220 13% 91% / 0.05);
-    --shadow-md: 0 4px 6px -1px hsl(220 13% 91% / 0.1), 0 2px 4px -2px hsl(220 13% 91% / 0.1);
-    --shadow-lg: 0 10px 15px -3px hsl(220 13% 91% / 0.1), 0 4px 6px -4px hsl(220 13% 91% / 0.1);
-    --shadow-card: 0 1px 3px 0 hsl(262 30% 50% / 0.05), 0 1px 2px -1px hsl(262 30% 50% / 0.05);
-    --shadow-card-hover: 0 4px 12px -2px hsl(262 30% 50% / 0.12);
+    --shadow-sm: 0 1px 2px 0 hsl(230 40% 20% / 0.06);
+    --shadow-md: 0 4px 6px -1px hsl(230 40% 20% / 0.08), 0 2px 4px -2px hsl(230 40% 20% / 0.06);
+    --shadow-lg: 0 10px 15px -3px hsl(230 40% 20% / 0.10), 0 4px 6px -4px hsl(230 40% 20% / 0.06);
+    --shadow-card: 0 1px 2px 0 hsl(230 40% 20% / 0.05), 0 4px 14px -4px hsl(230 40% 20% / 0.08);
+    --shadow-card-hover: 0 2px 4px 0 hsl(230 40% 20% / 0.06), 0 12px 28px -8px hsl(243 57% 42% / 0.22);
   }
 
   .dark {
@@ -104,17 +115,29 @@
     --secondary-foreground: 262 30% 90%;
     
     --muted: 222 30% 18%;
-    --muted-foreground: 215 20% 65%;
-    
+    --muted-foreground: 218 17% 71%;
+
     --accent: 262 30% 20%;
     --accent-foreground: 262 30% 90%;
-    
-    --destructive: 0 62% 30%;
+
+    /* Dark-surface ink colors (all >= 6:1 on the dark card) */
+    --ink-muted: 221 16% 70%;
+    --ink-primary: 229 94% 82%;
+    --ink-success: 158 64% 52%;
+    --ink-warning: 43 96% 56%;
+    --ink-danger: 0 91% 71%;
+    --ink-purple: 255 92% 83%;
+    --line: 226 26% 22%;
+
+    --destructive: 0 62% 38%;
     --destructive-foreground: 210 40% 98%;
-    
-    --border: 222 30% 20%;
-    --input: 222 30% 20%;
-    --ring: 262 83% 65%;
+
+    --border: 226 26% 22%;
+    --input: 226 24% 28%;
+    --ring: 243 94% 76%;
+
+    --shadow-card: 0 1px 2px 0 hsl(0 0% 0% / 0.35), 0 6px 18px -6px hsl(0 0% 0% / 0.45);
+    --shadow-card-hover: 0 2px 4px 0 hsl(0 0% 0% / 0.4), 0 14px 30px -8px hsl(243 94% 76% / 0.18);
     
     --sidebar-background: 262 47% 8%;
     --sidebar-foreground: 262 20% 90%;
@@ -141,6 +164,43 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-family-body), 'DM Sans', system-ui, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+    text-rendering: optimizeLegibility;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.22);
+  }
+
+  /* Clear, consistent keyboard focus everywhere */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: 0.5rem;
+  }
+
+  /* Smooth state changes + tactile press feedback on every button.
+     Tailwind transition utilities (utilities layer) still win where set. */
+  button {
+    transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  button:not(:disabled):active {
+    transform: scale(0.975);
+  }
+
+  tbody tr {
+    transition: background-color 150ms ease;
+  }
+  tbody tr:hover {
+    background-color: hsl(var(--muted) / 0.65);
+  }
+
+  /* Numbers line up in columns and stat cards */
+  table, .tabular {
+    font-variant-numeric: tabular-nums;
   }
   
   h1, h2, h3, h4, h5, h6 {
@@ -317,9 +377,32 @@
     @apply p-6;
   }
   
-  /* Loading skeleton */
+  /* Loading skeleton with a soft shimmer sweep */
   .skeleton {
-    @apply animate-pulse bg-muted rounded;
+    @apply rounded bg-muted;
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(var(--background) / 0.65) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    background-repeat: no-repeat;
+    animation: shimmer 1.6s infinite linear;
+  }
+
+  /* Elevated card surface used across the hub */
+  .surface {
+    @apply rounded-2xl border border-line bg-card shadow-card;
+  }
+
+  .surface-interactive {
+    @apply surface transition-all duration-200;
+  }
+
+  .surface-interactive:hover {
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
   }
   
   /* Empty state */
@@ -355,17 +438,45 @@
 }
 
 @layer utilities {
-  /* Keep scrollable content usable while hiding scrollbar chrome throughout the app. */
-  *,
-  *::before,
-  *::after {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+  /* Thin, quiet scrollbars so wide tables and long lists are discoverable. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--ink-muted) / 0.35) transparent;
   }
 
   *::-webkit-scrollbar {
-    display: none;
+    width: 8px;
+    height: 8px;
   }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--ink-muted) / 0.3);
+    border: 2px solid transparent;
+    background-clip: content-box;
+    border-radius: 9999px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--ink-muted) / 0.55);
+  }
+
+  /* Staggered entrance for a group of cards/sections.
+     fill-mode "backwards" (not "both") so no transform lingers afterwards,
+     which would trap dropdowns and fixed-position children. */
+  .stagger > * {
+    animation: fade-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  .stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger > *:nth-child(2) { animation-delay: 60ms; }
+  .stagger > *:nth-child(3) { animation-delay: 120ms; }
+  .stagger > *:nth-child(4) { animation-delay: 180ms; }
+  .stagger > *:nth-child(5) { animation-delay: 240ms; }
+  .stagger > *:nth-child(6) { animation-delay: 300ms; }
+  .stagger > *:nth-child(n + 7) { animation-delay: 360ms; }
 
   .text-balance {
     text-wrap: balance;
@@ -378,5 +489,30 @@
   
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* Respect users who ask for less motion (also eases eye strain / vestibular issues). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  button:not(:disabled):active {
+    transform: none;
   }
 }

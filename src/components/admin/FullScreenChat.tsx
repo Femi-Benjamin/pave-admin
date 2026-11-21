@@ -17,7 +17,7 @@ export function FullScreenChat({ conversation, onClose }: FullScreenChatProps) {
             <X size={20} />
           </button>
         </div>
-        <p className="py-12 text-center text-sm text-[#9CA3AF]">
+        <p className="py-12 text-center text-sm text-ink-muted">
           Conversation history and sending messages are unavailable because the
           documented API collection has no messaging endpoints.
         </p>

@@ -28,13 +28,13 @@ export function AuditLogsSection() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#0D0F1C] dark:text-[#F0F2FF]">Audit Logs</h1>
-        <p className="text-sm text-[#6B7280] dark:text-[#94A3B8]">
+        <p className="text-sm text-ink-muted dark:text-[#94A3B8]">
           Administrative and system activity recorded by the platform.
         </p>
       </div>
 
       <div className="relative mb-4 max-w-md">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
         <input
           value={query}
           onChange={(e) => {
@@ -47,24 +47,24 @@ export function AuditLogsSection() {
       </div>
 
       {logs.isLoading ? (
-        <div className="rounded-2xl bg-white p-8 text-center text-sm text-[#9CA3AF] dark:bg-[#111327]">
+        <div className="rounded-2xl bg-white p-8 text-center text-sm text-ink-muted dark:bg-[#111327]">
           Loading audit logs...
         </div>
       ) : logs.isError ? (
         <div className="rounded-2xl bg-white p-8 text-center dark:bg-[#111327]">
           <p role="alert" className="mb-3 text-sm text-red-600">{logs.error.message}</p>
-          <button onClick={() => void logs.refetch()} className="font-semibold text-[#3730A3]">
+          <button onClick={() => void logs.refetch()} className="font-semibold text-ink-primary">
             Retry
           </button>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-2xl bg-white p-8 text-center text-sm text-[#9CA3AF] dark:bg-[#111327]">
+        <div className="rounded-2xl bg-white p-8 text-center text-sm text-ink-muted dark:bg-[#111327]">
           {query ? "No logs match your search." : "No audit logs recorded yet."}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-[#F1F3FB] bg-white shadow-sm dark:border-white/10 dark:bg-[#111327]">
+        <div className="overflow-x-auto rounded-2xl border border-line bg-white shadow-sm dark:border-white/10 dark:bg-[#111327]">
           <table className="w-full text-left text-sm">
-            <thead className="text-xs text-[#9CA3AF]">
+            <thead className="text-xs text-ink-muted">
               <tr>
                 <th className="p-4">Time</th>
                 <th className="p-4">Action</th>
@@ -77,16 +77,16 @@ export function AuditLogsSection() {
                 <tr
                   key={log.id}
                   onClick={() => setExpanded(expanded === log.id ? null : log.id)}
-                  className="cursor-pointer border-t border-[#F1F3FB] align-top hover:bg-[#F9FAFB] dark:border-white/10 dark:hover:bg-white/5"
+                  className="cursor-pointer border-t border-line align-top hover:bg-[#F9FAFB] dark:border-white/10 dark:hover:bg-white/5"
                 >
-                  <td className="whitespace-nowrap p-4 text-[#6B7280]">
+                  <td className="whitespace-nowrap p-4 text-ink-muted">
                     {log.createdAt && !Number.isNaN(Date.parse(log.createdAt))
                       ? new Date(log.createdAt).toLocaleString()
                       : "—"}
                   </td>
                   <td className="p-4 font-medium capitalize">{log.action.replace(/_/g, " ")}</td>
                   <td className="p-4">{log.actor}</td>
-                  <td className="p-4 text-[#6B7280]">
+                  <td className="p-4 text-ink-muted">
                     {log.description || "—"}
                     {expanded === log.id && (
                       <pre className="mt-2 max-w-xl overflow-x-auto rounded-lg bg-[#F1F3FB] p-3 text-xs dark:bg-white/5">
@@ -106,8 +106,8 @@ export function AuditLogsSection() {
               ))}
             </tbody>
           </table>
-          <div className="flex items-center justify-between border-t border-[#F1F3FB] p-4 text-sm dark:border-white/10">
-            <span className="text-[#9CA3AF]">
+          <div className="flex items-center justify-between border-t border-line p-4 text-sm dark:border-white/10">
+            <span className="text-ink-muted">
               {filtered.length} log{filtered.length === 1 ? "" : "s"} · page {current} of {totalPages}
             </span>
             <div className="flex gap-2">
@@ -115,7 +115,7 @@ export function AuditLogsSection() {
                 type="button"
                 disabled={current === 1}
                 onClick={() => setPage(current - 1)}
-                className="rounded-lg border border-[#E1E5EF] px-3 py-1.5 font-medium disabled:opacity-40 dark:border-white/10"
+                className="rounded-lg border border-[#C9CEDF] px-3 py-1.5 font-medium disabled:opacity-40 dark:border-white/10"
               >
                 Previous
               </button>
@@ -123,7 +123,7 @@ export function AuditLogsSection() {
                 type="button"
                 disabled={current === totalPages}
                 onClick={() => setPage(current + 1)}
-                className="rounded-lg border border-[#E1E5EF] px-3 py-1.5 font-medium disabled:opacity-40 dark:border-white/10"
+                className="rounded-lg border border-[#C9CEDF] px-3 py-1.5 font-medium disabled:opacity-40 dark:border-white/10"
               >
                 Next
               </button>
