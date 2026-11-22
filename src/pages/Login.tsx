@@ -1,5 +1,5 @@
 // PAVE Admin - Sign in page
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,20 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [notice] = useState(() => {
+    try {
+      return sessionStorage.getItem("pave_auth_notice") || "";
+    } catch {
+      return "";
+    }
+  });
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem("pave_auth_notice");
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -51,6 +65,7 @@ export default function Login() {
             <h2 className="mb-2 text-2xl font-bold text-foreground">Welcome back</h2>
             <p className="text-muted-foreground">Sign in to your admin account</p>
           </div>
+          {notice && !error && <div className="mb-5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-700 dark:text-amber-300" role="status">{notice}</div>}
           {error && <div className="mb-5 rounded-lg border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive" role="alert">{error}</div>}
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-2">

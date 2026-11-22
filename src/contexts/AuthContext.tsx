@@ -27,7 +27,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
-    const handleExpiredSession = () => {
+    const handleExpiredSession = (event: Event) => {
+      const detail = (event as CustomEvent<{ message?: string }>).detail;
+      try {
+        // Shown once on the login screen so the user knows why they were signed out.
+        sessionStorage.setItem(
+          'pave_auth_notice',
+          detail?.message || 'Your session has expired. Please log in again.',
+        );
+      } catch {
+        /* storage unavailable */
+      }
       setAdmin(null);
       sessionStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(STORAGE_KEY);

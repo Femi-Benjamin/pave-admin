@@ -32,12 +32,23 @@ function failedResponse<T>(response: ApiResponse<unknown>): ApiResponse<T> {
 
 const AUTH_EXPIRED_EVENT = "pave:auth-expired";
 
-function hasExpiredTokenMessage(body: unknown): boolean {
-  if (!isRecord(body)) return false;
+const SESSION_ENDED_PATTERN = new RegExp(
+  [
+    String.raw`\b(?:token|jwt|session)\b.{0,40}\b(?:expired|invalid|ended|terminated)\b`,
+    String.raw`\bjwt expired\b`,
+    String.raw`logged in (?:from|on) another (?:device|browser|session)`,
+    String.raw`\blog ?in again\b`,
+    String.raw`\b(?:session|token) (?:has )?(?:expired|ended)\b`,
+  ].join("|"),
+  "i",
+);
+
+function sessionEndedMessage(body: unknown): string | undefined {
+  if (!isRecord(body)) return undefined;
   const message = [body.message, body.error]
     .filter((value): value is string => typeof value === "string")
     .join(" ");
-  return /\b(?:token|jwt|session)\b.{0,40}\b(?:expired|invalid)\b|\bjwt expired\b/i.test(message);
+  return SESSION_ENDED_PATTERN.test(message) ? message : undefined;
 }
 function getStoredToken(): string | undefined {
   const token = sessionStorage.getItem("pave_admin_token");
@@ -82,11 +93,16 @@ async function requestApi(
       : undefined;
 
     const isLoginRequest = endpoint.endsWith("/admin/adminLogin");
-    const tokenExpired =
-      response.status === 401 ||
-      ((response.status === 403 || response.ok) && hasExpiredTokenMessage(body));
+    // The API reports "logged in from another device" / expired sessions with
+    // different status codes (and sometimes a 200), so match on the message too.
+    const endedMessage = sessionEndedMessage(body);
+    const tokenExpired = response.status === 401 || endedMessage !== undefined;
     if (token && !isLoginRequest && tokenExpired && typeof window !== "undefined") {
-      window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+      window.dispatchEvent(
+        new CustomEvent(AUTH_EXPIRED_EVENT, {
+          detail: { message: endedMessage ?? "Your session has expired. Please log in again." },
+        }),
+      );
     }
 
     if (!response.ok) {

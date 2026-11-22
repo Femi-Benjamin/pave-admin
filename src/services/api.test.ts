@@ -169,4 +169,48 @@ describe("admin API response normalization", () => {
     expect(fetchMock.mock.calls[1][0]).toBe("https://api.test/api/v1/auth/resetPassword");
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ token: "123456", password: "Str0ngPass!" });
   });
+
+  it.each([
+    [401, "You have logged in from another device. Please log in again."],
+    [200, "You have logged in from another device. Please log in again."],
+    [403, "Session expired, please log in again"],
+    [401, "jwt expired"],
+  ])("signals a forced logout for %i / %s", async (status, message) => {
+    const { adminService } = await loadServices();
+    window.sessionStorage.setItem("pave_admin_token", "abc");
+    const handler = vi.fn();
+    window.addEventListener("pave:auth-expired", handler);
+    fetchMock.mockResolvedValue({
+      ok: status === 200,
+      status,
+      headers: { get: () => "application/json" },
+      json: async () => ({ message }),
+    });
+
+    await adminService.getSavingsGroups();
+
+    window.removeEventListener("pave:auth-expired", handler);
+    window.sessionStorage.clear();
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect((handler.mock.calls[0][0] as CustomEvent).detail.message).toContain(message);
+  });
+
+  it("does not log out on an unrelated error", async () => {
+    const { adminService } = await loadServices();
+    window.sessionStorage.setItem("pave_admin_token", "abc");
+    const handler = vi.fn();
+    window.addEventListener("pave:auth-expired", handler);
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 500,
+      headers: { get: () => "application/json" },
+      json: async () => ({ message: "Internal server error" }),
+    });
+
+    await adminService.getSavingsGroups();
+
+    window.removeEventListener("pave:auth-expired", handler);
+    window.sessionStorage.clear();
+    expect(handler).not.toHaveBeenCalled();
+  });
 });
