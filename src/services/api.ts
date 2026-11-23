@@ -13,6 +13,7 @@ import type {
   CreateAdminAccountInput,
   CreateAdminAccountResponse,
 } from "@/types";
+import { recordServerDate } from "@/lib/serverClock";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") || "";
 
@@ -88,6 +89,7 @@ async function requestApi(
       },
     });
     const contentType = response.headers.get("content-type") || "";
+    recordServerDate(response.headers.get("date"));
     const body: unknown = contentType.includes("application/json")
       ? await response.json()
       : undefined;

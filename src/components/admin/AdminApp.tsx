@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useSyncExternalStore } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence, animate, useReducedMotion } from "framer-motion";
 import {
@@ -116,6 +116,17 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 import { documentedAdminRolePolicy, hasAdminCapability } from "@/lib/admin-rbac";
+import {
+  REGISTRATION_PERIOD_OPTIONS,
+  describePeriodRange,
+  formatRegistrationDate,
+  getPeriodRange,
+  isInRange,
+  parseRegistrationTime,
+  resolveNow,
+  type RegistrationPeriod,
+} from "@/lib/registrationPeriod";
+import { getServerOffsetMs, subscribeServerClock } from "@/lib/serverClock";
 import type {
   AdminTransaction,
   AdminPendingKycUser,
@@ -217,7 +228,7 @@ function mapAdminRoleToMember(user: AdminUserRole): Member {
     name: `${user.firstName} ${user.lastName}`.trim() || user.email,
     email: user.email,
     kyc: "Not available",
-    joined: user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "Not available",
+    joined: formatRegistrationDate(user.createdAt),
     ...(user.createdAt ? { createdAt: user.createdAt } : {}),
     ...(balance !== undefined ? { wallet: balance } : {}),
     status: user.isBlocked ? "Blocked" : "Not blocked",
@@ -828,8 +839,6 @@ function DashboardSection({
 }
 
 // ─── Members Section ──────────────────────────────────────────────────────────
-type RegistrationPeriod = "today" | "yesterday" | "3days" | "7days" | "week" | "month" | "all";
-
 function MembersSection({
   members,
   isLoading,
@@ -852,54 +861,28 @@ function MembersSection({
   const [registrationPeriod, setRegistrationPeriod] = useState<RegistrationPeriod>("all");
   const [memberPage, setMemberPage] = useState(1);
   const pageSize = 25;
-  const now = new Date();
-  const periodStart = new Date(now);
-  periodStart.setHours(0, 0, 0, 0);
-  const periodEnd = new Date(now);
-  if (registrationPeriod === "yesterday") {
-    periodEnd.setHours(0, 0, 0, 0);
-    periodStart.setDate(periodStart.getDate() - 1);
-  } else if (registrationPeriod === "3days") {
-    periodStart.setDate(periodStart.getDate() - 2);
-  } else if (registrationPeriod === "7days") {
-    periodStart.setDate(periodStart.getDate() - 6);
-  } else if (registrationPeriod === "week") {
-    const daysSinceMonday = (periodStart.getDay() + 6) % 7;
-    periodStart.setDate(periodStart.getDate() - daysSinceMonday);
-  } else if (registrationPeriod === "month") {
-    periodStart.setDate(1);
-  }
-  const datedMembers = members.filter((member) => {
-    if (!member.createdAt) return false;
-    return Number.isFinite(new Date(member.createdAt).getTime());
+  // Re-renders when the real server time becomes known after first paint.
+  const serverOffsetMs = useSyncExternalStore(subscribeServerClock, getServerOffsetMs);
+  const datedMembers = members.filter((member) => parseRegistrationTime(member.createdAt) !== undefined);
+  const newestRegistration = datedMembers.reduce<number | undefined>((latest, member) => {
+    const ms = parseRegistrationTime(member.createdAt) as number;
+    return latest === undefined || ms > latest ? ms : latest;
+  }, undefined);
+  // Day boundaries are Nigeria time and "now" is corrected for a wrong device clock,
+  // so the result no longer depends on how this computer's timezone/date is set up.
+  const { now, clockBehind: deviceClockBehind } = resolveNow({
+    deviceNow: Date.now(),
+    serverOffsetMs,
+    newestRegistration,
   });
-  const matchesRegistrationPeriod = (member: Member) => {
-    if (registrationPeriod === "all") return true;
-    if (!member.createdAt || !Number.isFinite(new Date(member.createdAt).getTime())) return false;
-    const createdAt = new Date(member.createdAt);
-    // Only "yesterday" needs an upper bound. Using "now" as the end of every other
-    // period made members vanish whenever the device clock was behind the server.
-    return createdAt >= periodStart && (registrationPeriod !== "yesterday" || createdAt < periodEnd);
-  };
+  const periodRange = getPeriodRange(registrationPeriod, now);
+  const matchesRegistrationPeriod = (member: Member) => isInRange(member.createdAt, periodRange);
   const registrationCount =
     members.length > 0 && datedMembers.length === 0
       ? undefined
       : datedMembers.filter(matchesRegistrationPeriod).length;
-  // A registration date later than this device's clock means the clock is behind.
-  const newestRegistration = datedMembers.reduce(
-    (latest, member) => Math.max(latest, new Date(member.createdAt as string).getTime()),
-    0,
-  );
-  const deviceClockBehind = newestRegistration > now.getTime() + 5 * 60 * 1000;
-  const registrationPeriodLabel = {
-    today: "Today",
-    yesterday: "Yesterday",
-    "3days": "Last 3 days",
-    "7days": "Last 7 days",
-    week: "This week",
-    month: "This month",
-    all: "All time",
-  }[registrationPeriod];
+  const registrationPeriodLabel =
+    REGISTRATION_PERIOD_OPTIONS.find((option) => option.value === registrationPeriod)?.label ?? "All time";
 
   const filtered = members.filter(
     (m) =>
@@ -934,9 +917,9 @@ function MembersSection({
       />
       {deviceClockBehind && (
         <div role="alert" className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
-          This device&apos;s date and time look wrong (a member registered after the time shown on this
-          computer). Period filters such as &quot;This month&quot; depend on the device clock, so fix the
-          date/time settings on this computer or use &quot;All time&quot;.
+          This device&apos;s clock looks behind (a member registered after the time shown on this
+          computer). Periods are being calculated from the most recent registration instead, so the
+          counts stay correct, but please fix the date and time on this computer.
         </div>
       )}
       <section className="mb-4 flex flex-col gap-4 rounded-2xl border border-[#E8EAF4] bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#111327] sm:flex-row sm:items-center sm:justify-between">
@@ -961,15 +944,14 @@ function MembersSection({
               <SelectValue placeholder="Choose a period" />
             </SelectTrigger>
             <SelectContent position="popper" className="rounded-xl">
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="yesterday">Yesterday</SelectItem>
-              <SelectItem value="3days">Last 3 days</SelectItem>
-              <SelectItem value="7days">Last 7 days</SelectItem>
-              <SelectItem value="week">This week</SelectItem>
-              <SelectItem value="month">This month</SelectItem>
-              <SelectItem value="all">All time</SelectItem>
+              {REGISTRATION_PERIOD_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
+          <p className="mt-1.5 text-xs text-ink-muted dark:text-[#94A3B8]">{describePeriodRange(periodRange)}</p>
         </div>
       </section>      <div className="bg-white dark:bg-[#111327] rounded-2xl border border-line dark:border-white/10 overflow-hidden shadow-sm">
         <div className="p-4 border-b border-line dark:border-white/10 flex flex-col sm:flex-row gap-3">
@@ -1200,7 +1182,7 @@ function MemberDetailSection({
             {m.name}
           </h1>
           <p className="text-ink-muted dark:text-[#94A3B8] text-sm">
-            Member since {m.signUpOn ? new Date(m.signUpOn).toLocaleDateString() : "Not available"}
+            Member since {formatRegistrationDate(m.signUpOn)}
           </p>
         </div>
       </div>
@@ -1266,7 +1248,7 @@ function MemberDetailSection({
               {[
                 ["Group", m.group],
                 ["Status", m.status || "Not available"],
-                ["Joined", m.signUpOn ? new Date(m.signUpOn).toLocaleDateString() : "Not available"],
+                ["Joined", formatRegistrationDate(m.signUpOn)],
                 ["KYC Status", "Not available"],
                 ["Account Number", m.accountNumber || "Not available"],
                 ["Bank Tier", "Not available"],
