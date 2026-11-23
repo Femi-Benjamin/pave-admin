@@ -849,7 +849,7 @@ function MembersSection({
 }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
-  const [registrationPeriod, setRegistrationPeriod] = useState<RegistrationPeriod>("month");
+  const [registrationPeriod, setRegistrationPeriod] = useState<RegistrationPeriod>("all");
   const [memberPage, setMemberPage] = useState(1);
   const pageSize = 25;
   const now = new Date();
@@ -877,12 +877,20 @@ function MembersSection({
     if (registrationPeriod === "all") return true;
     if (!member.createdAt || !Number.isFinite(new Date(member.createdAt).getTime())) return false;
     const createdAt = new Date(member.createdAt);
-    return createdAt >= periodStart && createdAt < periodEnd;
+    // Only "yesterday" needs an upper bound. Using "now" as the end of every other
+    // period made members vanish whenever the device clock was behind the server.
+    return createdAt >= periodStart && (registrationPeriod !== "yesterday" || createdAt < periodEnd);
   };
   const registrationCount =
     members.length > 0 && datedMembers.length === 0
       ? undefined
       : datedMembers.filter(matchesRegistrationPeriod).length;
+  // A registration date later than this device's clock means the clock is behind.
+  const newestRegistration = datedMembers.reduce(
+    (latest, member) => Math.max(latest, new Date(member.createdAt as string).getTime()),
+    0,
+  );
+  const deviceClockBehind = newestRegistration > now.getTime() + 5 * 60 * 1000;
   const registrationPeriodLabel = {
     today: "Today",
     yesterday: "Yesterday",
@@ -924,6 +932,13 @@ function MembersSection({
           </button>
         }
       />
+      {deviceClockBehind && (
+        <div role="alert" className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
+          This device&apos;s date and time look wrong (a member registered after the time shown on this
+          computer). Period filters such as &quot;This month&quot; depend on the device clock, so fix the
+          date/time settings on this computer or use &quot;All time&quot;.
+        </div>
+      )}
       <section className="mb-4 flex flex-col gap-4 rounded-2xl border border-[#E8EAF4] bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#111327] sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">New registrations</p>
@@ -993,6 +1008,17 @@ function MembersSection({
         ) : filtered.length === 0 ? (
           <div className="p-8 text-center text-sm text-ink-muted">
             {members.length === 0 ? "No users found." : `No users registered ${registrationPeriodLabel.toLowerCase()} match these filters.`}
+            {members.length > 0 && registrationPeriod !== "all" && (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => { setRegistrationPeriod("all"); setMemberPage(1); }}
+                  className="font-semibold text-ink-primary hover:underline"
+                >
+                  Show all {members.length} members
+                </button>
+              </div>
+            )}
           </div>
         ) : (
         <>
