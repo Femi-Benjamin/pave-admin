@@ -84,7 +84,7 @@ export function WalletDetailsDialog({
               </div>
             </div>
 
-            <ScrollableRegion wrapperClassName="flex-1" className="p-6" showHint={false}>
+            <ScrollableRegion wrapperClassName="flex-1" className="p-6">
               <div className="mb-6 rounded-2xl bg-gradient-to-r from-[#1E1B4B] to-[#3730A3] p-5 text-white shadow-lg">
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div>

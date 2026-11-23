@@ -1520,7 +1520,13 @@ function KYCSection({
           </p>
         </div>
       ) : (
-        <div className={`max-h-[calc(100dvh-14rem)] min-h-[240px] overflow-y-auto overscroll-contain pr-1 scrollbar-hide grid items-start gap-2.5 ${cardDensity === "compact" ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"}`}>
+        <ScrollableRegion
+          className={`max-h-[calc(100dvh-14rem)] min-h-[240px] pr-1 grid items-start gap-2.5 ${cardDensity === "compact" ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"}`}
+          fadeFrom="from-[#F7F8FF] dark:from-[#0A0B18]"
+          itemSelector=":scope > *"
+          itemLabel={["review", "reviews"]}
+          backToTop
+        >
           {queue.map((k) => (
             <div
               key={k.id}
@@ -1598,7 +1604,7 @@ function KYCSection({
               </div>
             </div>
           ))}
-        </div>
+        </ScrollableRegion>
       )}
 
       {/* Document Preview Modal */}
@@ -3831,7 +3837,12 @@ export function AdminApp({
         </header>
 
         {/* Scrollable Page Body: Locked window scroll with clean interior scrolling */}
-        <main className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 xl:p-8 overscroll-contain">
+        <main className="relative flex min-h-0 flex-1 flex-col">
+          <ScrollableRegion
+            wrapperClassName="flex-1"
+            className="p-4 sm:p-6 xl:p-8"
+            fadeFrom="from-[#F7F8FF] dark:from-[#0A0B18]"
+          >
           <AnimatePresence mode="wait">
             <motion.div
               key={section}
@@ -3844,6 +3855,7 @@ export function AdminApp({
               {renderSection()}
             </motion.div>
           </AnimatePresence>
+          </ScrollableRegion>
         </main>
       </div>
 

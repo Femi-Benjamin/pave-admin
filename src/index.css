@@ -210,52 +210,14 @@
 }
 
 @layer components {
-  /* Always-visible scrollbar for scrollable panels, so people can tell there is
-     more content. Thumb is >= 3:1 against its track in both themes. */
+  /* Scrollable panels keep scrolling but never draw a scrollbar. */
   .admin-dialog-scrollbar {
-    scrollbar-width: auto;
-    scrollbar-color: #7A8099 #E8EAF3;
-    scrollbar-gutter: stable;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
 
   .admin-dialog-scrollbar::-webkit-scrollbar {
-    width: 12px;
-    height: 12px;
-  }
-
-  .admin-dialog-scrollbar::-webkit-scrollbar-track {
-    background: #EEF0F7;
-    border-left: 1px solid #E1E4EF;
-    border-radius: 9999px;
-  }
-
-  .admin-dialog-scrollbar::-webkit-scrollbar-thumb {
-    border: 3px solid #EEF0F7;
-    border-radius: 9999px;
-    background-color: #7A8099;
-    background-clip: padding-box;
-  }
-
-  .admin-dialog-scrollbar::-webkit-scrollbar-thumb:hover {
-    background-color: #4F5670;
-  }
-
-  .dark .admin-dialog-scrollbar {
-    scrollbar-color: #8A90AB #1B1E3A;
-  }
-
-  .dark .admin-dialog-scrollbar::-webkit-scrollbar-track {
-    background: #1B1E3A;
-    border-left-color: #272A4A;
-  }
-
-  .dark .admin-dialog-scrollbar::-webkit-scrollbar-thumb {
-    border-color: #1B1E3A;
-    background-color: #8A90AB;
-  }
-
-  .dark .admin-dialog-scrollbar::-webkit-scrollbar-thumb:hover {
-    background-color: #B4B9D0;
+    display: none;
   }
 
   /* KPI Card styles */
@@ -449,30 +411,17 @@
 }
 
 @layer utilities {
-  /* Thin, quiet scrollbars so wide tables and long lists are discoverable. */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: hsl(var(--ink-muted) / 0.55) transparent;
+  /* No visible scrollbars anywhere, vertical or horizontal. Scrollable areas signal
+     "there is more" with in-content cues instead (see ScrollableRegion). */
+  *,
+  *::before,
+  *::after {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
 
   *::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-  }
-
-  *::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  *::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--ink-muted) / 0.5);
-    border: 2px solid transparent;
-    background-clip: content-box;
-    border-radius: 9999px;
-  }
-
-  *::-webkit-scrollbar-thumb:hover {
-    background-color: hsl(var(--ink-muted) / 0.55);
+    display: none;
   }
 
   /* Staggered entrance for a group of cards/sections.
