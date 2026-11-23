@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Check, ChevronDown, Copy, Zap } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { ScrollableRegion } from "@/components/ui/scrollable-region";
 import { toast } from "@/components/ui/sonner";
 import type { AdminTransaction } from "@/types";
 
@@ -226,7 +227,7 @@ export function TransactionDetailsDialog({
               )}
             </header>
 
-            <div className="admin-dialog-scrollbar min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain bg-[#F9FAFB] px-6 py-5 dark:bg-[#0D0F20]">
+            <ScrollableRegion wrapperClassName="flex-1" className="space-y-5 bg-[#F9FAFB] px-6 py-5 dark:bg-[#0D0F20]" fadeFrom="from-[#F9FAFB] dark:from-[#0D0F20]">
               {isRefreshing && (
                 <p className="text-xs text-ink-muted">Refreshing latest details…</p>
               )}
@@ -349,7 +350,7 @@ export function TransactionDetailsDialog({
                   </dl>
                 </CollapsibleContent>
               </Collapsible>
-            </div>
+            </ScrollableRegion>
           </>
         )}
       </DialogContent>

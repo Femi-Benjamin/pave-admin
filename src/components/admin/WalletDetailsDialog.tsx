@@ -1,4 +1,5 @@
-import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Ban, UserCheck } from "lucide-react";
+import { ScrollableRegion } from "@/components/ui/scrollable-region";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import type { AdminUserDetails, AdminUserTransaction } from "@/types";
 
@@ -83,7 +84,7 @@ export function WalletDetailsDialog({
               </div>
             </div>
 
-            <div className="admin-dialog-scrollbar min-h-0 flex-1 overflow-y-auto p-6">
+            <ScrollableRegion wrapperClassName="flex-1" className="p-6" showHint={false}>
               <div className="mb-6 rounded-2xl bg-gradient-to-r from-[#1E1B4B] to-[#3730A3] p-5 text-white shadow-lg">
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div>
@@ -146,20 +147,6 @@ export function WalletDetailsDialog({
                       <div className="mt-1 font-medium text-[#374151] dark:text-gray-200">{when(d.lastLogin, true)}</div>
                     </div>
                   </div>
-                  <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-line p-3 dark:border-white/10">
-                    <p className="text-sm text-ink-muted dark:text-[#94A3B8]">
-                      {blocked ? "This user is blocked and cannot sign in." : "This user is active."}
-                    </p>
-                    <button
-                      onClick={onToggleBlock}
-                      disabled={isTogglingBlock}
-                      className={`shrink-0 rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 ${
-                        blocked ? "bg-[#3730A3] hover:bg-[#312E81]" : "bg-[#DC2626] hover:bg-[#B91C1C]"
-                      }`}
-                    >
-                      {isTogglingBlock ? "Updating…" : blocked ? "Unblock User" : "Block User"}
-                    </button>
-                  </div>
                 </>
               )}
 
@@ -170,7 +157,7 @@ export function WalletDetailsDialog({
                   </h3>
                   <span className="text-xs text-ink-muted">{transactions.data?.length ?? 0} transactions</span>
                 </div>
-                <div className="admin-dialog-scrollbar max-h-[19rem] space-y-2 overflow-y-auto overscroll-contain pr-1">
+                <ScrollableRegion className="max-h-[19rem] space-y-2 pr-2" hint="More transactions">
                   {transactions.isLoading ? (
                     <p className="py-4 text-center text-sm text-ink-muted">Loading user transactions…</p>
                   ) : transactions.isError ? (
@@ -186,7 +173,7 @@ export function WalletDetailsDialog({
                       return (
                         <div key={tx._id || tx.reference} className="flex items-center justify-between rounded-xl bg-[#F9FAFB] p-3 text-xs dark:bg-white/5">
                           <div className="flex min-w-0 items-center gap-3">
-                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${credit ? "bg-[#ECFDF5] text-[#047857]" : "bg-[#FEF2F2] text-[#B91C1C]"}`}>
+                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${credit ? "bg-[#ECFDF5] text-[#047857] dark:bg-[#10B981]/15 dark:text-[#6EE7B7]" : "bg-[#FEF2F2] text-[#B91C1C] dark:bg-[#EF4444]/15 dark:text-[#FCA5A5]"}`}>
                               {credit ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
                             </div>
                             <div className="min-w-0">
@@ -208,9 +195,32 @@ export function WalletDetailsDialog({
                   ) : (
                     <p className="py-4 text-center text-sm text-ink-muted">No transactions found for this user.</p>
                   )}
-                </div>
+                </ScrollableRegion>
               </div>
-            </div>
+            </ScrollableRegion>
+            {d && (
+              <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-white px-6 py-4 shadow-[0_-10px_18px_-14px_rgba(15,23,42,0.25)] dark:border-white/10 dark:bg-[#111327]">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span
+                    aria-hidden="true"
+                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${blocked ? "bg-[#DC2626]" : "bg-[#10B981]"}`}
+                  />
+                  <p className="text-sm text-ink-muted">
+                    {blocked ? "This user is blocked and cannot sign in." : "This user is active."}
+                  </p>
+                </div>
+                <button
+                  onClick={onToggleBlock}
+                  disabled={isTogglingBlock}
+                  className={`flex shrink-0 items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60 ${
+                    blocked ? "bg-[#3730A3] hover:bg-[#312E81]" : "bg-[#DC2626] hover:bg-[#B91C1C]"
+                  }`}
+                >
+                  {blocked ? <UserCheck size={15} aria-hidden="true" /> : <Ban size={15} aria-hidden="true" />}
+                  {isTogglingBlock ? "Updating…" : blocked ? "Unblock User" : "Block User"}
+                </button>
+              </div>
+            )}
           </>
         )}
       </DialogContent>

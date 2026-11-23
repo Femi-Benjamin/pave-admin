@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useSyncExternalStore } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence, animate, useReducedMotion } from "framer-motion";
+import { ScrollableRegion } from "@/components/ui/scrollable-region";
 import {
   LayoutDashboard,
   Users,
@@ -2182,7 +2183,7 @@ function WalletsSection({
             </p>
           </div>
         </div>
-        <div className="max-h-[min(65vh,620px)] overflow-auto overscroll-contain">
+        <ScrollableRegion className="max-h-[min(65vh,620px)] overflow-auto" showTopFade={false} hint="Scroll for more members">
           <table className="w-full min-w-[650px]">
             <thead className="sticky top-0 z-10 bg-[#F9FAFB] shadow-[0_1px_0_0_hsl(var(--line))] dark:bg-[#17192F]">
               <tr>
@@ -2263,7 +2264,7 @@ function WalletsSection({
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollableRegion>
       </div>
     </div>
   );
