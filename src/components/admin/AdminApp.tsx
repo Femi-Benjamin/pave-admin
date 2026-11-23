@@ -47,6 +47,12 @@ import {
   AlertTriangle,
   Sparkles,
   ScrollText,
+  Phone,
+  Copy,
+  CalendarDays,
+  Hash,
+  Ban,
+  UserCheck,
 } from "lucide-react";
 import {
   AreaChart,
@@ -275,7 +281,10 @@ function isAdminTransaction(value: unknown): value is AdminTransaction {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmt = (n: number) =>
-  `₦${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+  `₦${n.toLocaleString(undefined, {
+    minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
 const pct = (a: number, b: number) => Math.min(100, Math.round((a / b) * 100));
 
 // ─── Shared UI Components ────────────────────────────────────────────────────
@@ -1114,6 +1123,81 @@ function MembersSection({
   );
 }
 
+// ─── Member profile helpers ──────────────────────────────────────────────────
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      toast.success(`${label} copied`);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error("Unable to copy");
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={() => void handleCopy()}
+      aria-label={`Copy ${label}`}
+      className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-ink-muted opacity-70 hover:bg-[#EEF2FF] hover:text-ink-primary hover:opacity-100 focus-visible:opacity-100 dark:hover:bg-white/10 group-hover/row:opacity-100"
+    >
+      {copied ? <Check size={15} className="text-ink-success" /> : <Copy size={15} />}
+    </button>
+  );
+}
+
+function ContactRow({
+  icon,
+  label,
+  value,
+  copyable = true,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  copyable?: boolean;
+}) {
+  const available = copyable && value !== "Not available";
+  return (
+    <div className="group/row flex items-center gap-3 rounded-xl border border-line bg-[#F9FAFB] p-2.5 transition-colors hover:border-[#3730A3]/30 dark:border-white/10 dark:bg-white/5 dark:hover:border-[#818CF8]/40">
+      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-white text-ink-primary shadow-sm dark:bg-[#818CF8]/15">
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1 text-left">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">{label}</div>
+        <div className="truncate text-sm font-medium text-[#0D0F1C] dark:text-[#F0F2FF]" title={value}>
+          {value}
+        </div>
+      </div>
+      {available && <CopyButton value={value} label={label} />}
+    </div>
+  );
+}
+
+function InfoItem({
+  icon,
+  label,
+  children,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-line p-3 dark:border-white/10">
+      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[#F3F4F6] text-ink-muted dark:bg-white/10">
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <div className="text-xs text-ink-muted">{label}</div>
+        <div className="truncate text-sm font-semibold capitalize text-[#0D0F1C] dark:text-[#F0F2FF]">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Member Detail Section ───────────────────────────────────────────────────
 function MemberDetailSection({
   member,
@@ -1186,91 +1270,154 @@ function MemberDetailSection({
           </p>
         </div>
       </div>
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="xl:col-span-1 bg-white dark:bg-[#111327] rounded-2xl p-5 border border-line dark:border-white/10 flex flex-col items-center text-center gap-4 shadow-sm">
-          <div className="w-20 h-20 rounded-full bg-[#EEF2FF] dark:bg-[#818CF8]/20 flex items-center justify-center text-ink-primary dark:text-[#818CF8] text-2xl font-bold">
-            {m.name
-              .split(" ")
-              .map((n) => n[0])
-              .join("")}
+      <div className="stagger grid grid-cols-1 items-start gap-4 xl:grid-cols-3">
+        {/* ── Profile card ── */}
+        <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-card dark:border-white/10 dark:bg-[#111327] xl:sticky xl:top-4">
+          <div className="relative h-28 overflow-hidden bg-gradient-to-br from-[#312E81] via-[#4F46E5] to-[#7C3AED]">
+            <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-10 h-40 w-40 rounded-full bg-white/10" />
+            <div aria-hidden="true" className="pointer-events-none absolute -bottom-16 left-6 h-36 w-36 rounded-full bg-white/10" />
+            <div aria-hidden="true" className="pointer-events-none absolute right-24 top-8 h-10 w-10 rounded-full bg-white/10" />
+            <span
+              className={`absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-semibold shadow-sm ${
+                blocked ? "text-[#B91C1C]" : "text-[#047857]"
+              }`}
+            >
+              <span className={`h-2 w-2 rounded-full ${blocked ? "bg-[#DC2626]" : "bg-[#10B981]"}`} />
+              {blocked ? "Blocked" : "Active"}
+            </span>
           </div>
-          <div>
-            <div className="font-bold text-lg text-[#0D0F1C] dark:text-[#F0F2FF]">
-              {m.name}
-            </div>
-            <div className="text-sm text-ink-muted">{m.email}</div>
-            <div className="text-sm text-ink-muted">{m.phone || "Not available"}</div>
-          </div>
-          <Badge color="gray">KYC: Not available</Badge>
-          <div className="grid grid-cols-2 gap-3 w-full">
-            <a href={`mailto:${m.email}`} className="py-2 bg-[#EEF2FF] dark:bg-[#818CF8]/20 text-ink-primary dark:text-[#818CF8] rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 hover:opacity-90">
-              <Mail size={13} />
-              Email
-            </a>
-            <button disabled title="Direct messaging from the admin hub is not connected yet" className="py-2 bg-[#ECFDF5] dark:bg-[#10B981]/20 text-ink-success dark:text-[#6EE7B7] rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 opacity-50">
-              <MessageSquare size={13} />
-              Message unavailable
-            </button>
-          </div>
-        </div>
-        <div className="xl:col-span-2 flex flex-col gap-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-white dark:bg-[#111327] rounded-2xl p-4 border border-line dark:border-white/10 shadow-card">
-              <div className="text-xs text-ink-muted mb-1">Wallet Balance</div>
-              <div
-                className="text-xl font-bold text-[#0D0F1C] dark:text-[#F0F2FF]"
-                style={{
-                  fontFamily:
-                    "var(--font-family-display, 'Bricolage Grotesque')",
-                }}
+          <div className="px-5 pb-5">
+            <div className="relative z-10 -mt-12 flex flex-col items-center text-center">
+              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-[#EEF2FF] to-[#E0E7FF] text-3xl font-bold text-ink-primary shadow-lg ring-4 ring-white dark:from-[#25285A] dark:to-[#1B1D45] dark:text-[#A5B4FC] dark:ring-[#111327]">
+                {m.name
+                  .split(" ")
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((n) => n[0])
+                  .join("")
+                  .toUpperCase()}
+              </div>
+              <h2
+                className="mt-3 text-xl font-bold tracking-tight text-[#0D0F1C] dark:text-[#F0F2FF]"
+                style={{ fontFamily: "var(--font-family-display, 'Bricolage Grotesque')" }}
               >
-                {m.balance === undefined ? "—" : fmt(Number(m.balance))}
+                {m.name}
+              </h2>
+              <p className="mt-0.5 flex items-center gap-1.5 text-sm text-ink-muted">
+                <CalendarDays size={14} aria-hidden="true" />
+                Member since {formatRegistrationDate(m.signUpOn)}
+              </p>
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                <Badge color="gray">
+                  <Shield size={12} aria-hidden="true" /> KYC: Not available
+                </Badge>
+                {m.group && m.group !== "Not available" && (
+                  <Badge color="indigo">
+                    <Users size={12} aria-hidden="true" /> {m.group}
+                  </Badge>
+                )}
               </div>
             </div>
-            <div className="bg-white dark:bg-[#111327] rounded-2xl p-4 border border-line dark:border-white/10 shadow-card">
-              <div className="text-xs text-ink-muted mb-1">Total Savings</div>
+            <div className="mt-5 flex flex-col gap-2">
+              <ContactRow icon={<Mail size={16} />} label="Email" value={m.email} />
+              <ContactRow icon={<Phone size={16} />} label="Phone" value={m.phone || "Not available"} />
+              <ContactRow icon={<Hash size={16} />} label="Account number" value={m.accountNumber || "Not available"} />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <a
+                href={`mailto:${m.email}`}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-[#3730A3] py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#312E81] hover:shadow-md active:scale-[0.98]"
+              >
+                <Mail size={15} aria-hidden="true" />
+                Email
+              </a>
+              <button
+                disabled
+                title="Direct messaging from the admin hub is not connected yet"
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-line bg-[#F9FAFB] py-2.5 text-sm font-semibold text-ink-muted opacity-70 disabled:cursor-not-allowed dark:border-white/10 dark:bg-white/5"
+              >
+                <MessageSquare size={15} aria-hidden="true" />
+                Message
+              </button>
+            </div>
+            <p className="mt-2 text-center text-xs text-ink-muted">Direct messaging isn't connected yet</p>
+          </div>
+        </div>
+
+        {/* ── Right column ── */}
+        <div className="stagger flex flex-col gap-4 xl:col-span-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="group rounded-2xl border border-line bg-white p-5 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover dark:border-white/10 dark:bg-[#111327]">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EEF2FF] text-ink-primary transition-transform group-hover:scale-105 dark:bg-[#818CF8]/15">
+                  <Wallet size={20} />
+                </div>
+                <div className="text-sm font-medium text-ink-muted">Wallet Balance</div>
+              </div>
               <div
-                className="text-xl font-bold text-ink-success"
-                style={{
-                  fontFamily:
-                    "var(--font-family-display, 'Bricolage Grotesque')",
-                }}
+                className="tabular mt-4 text-3xl font-bold tracking-tight text-[#0D0F1C] dark:text-[#F0F2FF]"
+                style={{ fontFamily: "var(--font-family-display, 'Bricolage Grotesque')" }}
+              >
+                <AnimatedValue value={m.balance === undefined ? "—" : fmt(Number(m.balance))} />
+              </div>
+            </div>
+            <div className="group rounded-2xl border border-line bg-white p-5 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover dark:border-white/10 dark:bg-[#111327]">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#ECFDF5] text-ink-success transition-transform group-hover:scale-105 dark:bg-[#10B981]/15">
+                  <PiggyBank size={20} />
+                </div>
+                <div className="text-sm font-medium text-ink-muted">Total Savings</div>
+              </div>
+              <div
+                className="mt-4 text-3xl font-bold tracking-tight text-ink-success"
+                style={{ fontFamily: "var(--font-family-display, 'Bricolage Grotesque')" }}
               >
                 —
               </div>
+              <div className="mt-1 text-xs text-ink-muted">Not available from the user API</div>
             </div>
           </div>
-          <div className="bg-white dark:bg-[#111327] rounded-2xl p-5 border border-line dark:border-white/10 shadow-card">
-            <div className="font-semibold text-[#0D0F1C] dark:text-[#F0F2FF] mb-3">
+
+          <div className="rounded-2xl border border-line bg-white p-5 shadow-card dark:border-white/10 dark:bg-[#111327]">
+            <div
+              className="mb-4 text-base font-bold text-[#0D0F1C] dark:text-[#F0F2FF]"
+              style={{ fontFamily: "var(--font-family-display, 'Bricolage Grotesque')" }}
+            >
               Member Info
             </div>
-            <div className="flex flex-col gap-2">
-              {[
-                ["Group", m.group],
-                ["Status", m.status || "Not available"],
-                ["Joined", formatRegistrationDate(m.signUpOn)],
-                ["KYC Status", "Not available"],
-                ["Account Number", m.accountNumber || "Not available"],
-                ["Bank Tier", "Not available"],
-              ].map(([k, v]) => (
-                <div
-                  key={k}
-                  className="flex justify-between text-sm py-1 border-b border-[#F9FAFB] dark:border-white/5 last:border-0"
-                >
-                  <span className="text-ink-muted">{k}</span>
-                  <span className="font-medium capitalize text-[#0D0F1C] dark:text-[#F0F2FF]">
-                    {v}
-                  </span>
-                </div>
-              ))}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <InfoItem icon={<Users size={16} />} label="Group">
+                {m.group}
+              </InfoItem>
+              <InfoItem icon={blocked ? <Ban size={16} /> : <UserCheck size={16} />} label="Status">
+                <Badge color={blocked ? "red" : "green"}>{m.status || "Not available"}</Badge>
+              </InfoItem>
+              <InfoItem icon={<CalendarDays size={16} />} label="Joined">
+                {formatRegistrationDate(m.signUpOn)}
+              </InfoItem>
+              <InfoItem icon={<Shield size={16} />} label="KYC Status">
+                Not available
+              </InfoItem>
+              <InfoItem icon={<Hash size={16} />} label="Account Number">
+                {m.accountNumber || "Not available"}
+              </InfoItem>
+              <InfoItem icon={<Building size={16} />} label="Bank Tier">
+                Not available
+              </InfoItem>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3">
+
+          <div className="flex flex-col gap-3 sm:flex-row">
             <button
               onClick={() => void handleBlock()}
               disabled={blockUser.isPending}
-              className="flex-1 py-2.5 bg-[#FEF2F2] text-ink-danger hover:bg-[#FEE2E2] dark:bg-[#EF4444]/20 dark:text-[#FCA5A5] rounded-xl text-sm font-semibold transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+              className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
+                blocked
+                  ? "bg-[#ECFDF5] text-ink-success hover:bg-[#D1FAE5] dark:bg-[#10B981]/20 dark:text-[#6EE7B7]"
+                  : "bg-[#FEF2F2] text-ink-danger hover:bg-[#FEE2E2] dark:bg-[#EF4444]/20 dark:text-[#FCA5A5]"
+              }`}
             >
+              {blocked ? <UserCheck size={16} /> : <Ban size={16} />}
               {blockUser.isPending ? "Updating..." : blocked ? "Unblock Member" : "Block Member"}
             </button>
           </div>
