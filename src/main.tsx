@@ -1,9 +1,11 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { syncServerClock } from "./lib/serverClock";
+import { initClockFromSession, syncServerClock } from "./lib/serverClock";
 
-// Learn the real time from our own origin so date filters survive a wrong device clock.
+// Date filters must not trust this computer's clock: restore the server time measured
+// at login, and also read it from our own origin.
+initClockFromSession();
 void syncServerClock();
 
 createRoot(document.getElementById("root")!).render(<App />);

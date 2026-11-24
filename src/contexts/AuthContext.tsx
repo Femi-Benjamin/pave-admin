@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminUser } from '@/types';
 import { authService } from '@/services/api';
 import { AuthContext, STORAGE_KEY } from './auth-context-def';
+import { recordLogin, registerSessionToken } from '@/lib/serverClock';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [admin, setAdmin] = useState<AdminUser | null>(null);
@@ -22,6 +23,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(authenticatedAdmin));
       if (authenticatedAdmin.token) {
         sessionStorage.setItem('pave_admin_token', authenticatedAdmin.token);
+        // The token's issued-at time is the server's clock: compare it with this device's now.
+        recordLogin(authenticatedAdmin.token);
       }
     },
   });
@@ -43,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem(STORAGE_KEY);
       sessionStorage.removeItem('pave_admin_token');
       localStorage.removeItem('pave_admin_token');
+      registerSessionToken(undefined);
       queryClient.clear();
     };
 
@@ -91,6 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem(STORAGE_KEY);
       sessionStorage.removeItem('pave_admin_token');
       localStorage.removeItem('pave_admin_token');
+      registerSessionToken(undefined);
       queryClient.clear();
       setIsLoading(false);
     }

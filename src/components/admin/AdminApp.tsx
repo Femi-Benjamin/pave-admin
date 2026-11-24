@@ -133,13 +133,22 @@ import {
   resolveNow,
   type RegistrationPeriod,
 } from "@/lib/registrationPeriod";
-import { getServerOffsetMs, subscribeServerClock } from "@/lib/serverClock";
+import { describeClockSkew, getClockStatus, subscribeServerClock, type ClockSource } from "@/lib/serverClock";
+
 import type {
   AdminTransaction,
   AdminPendingKycUser,
   AdminTransactionUser,
   AdminUserRole,
 } from "@/types";
+
+const CLOCK_SOURCE_LABELS: Record<ClockSource, string> = {
+  login: "server time (from login)",
+  api: "server time (from API)",
+  origin: "server time (from app host)",
+  "token-window": "estimated from your session",
+  device: "this computer (not verified)",
+};
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 export type AdminSection =
@@ -872,7 +881,9 @@ function MembersSection({
   const [memberPage, setMemberPage] = useState(1);
   const pageSize = 25;
   // Re-renders when the real server time becomes known after first paint.
-  const serverOffsetMs = useSyncExternalStore(subscribeServerClock, getServerOffsetMs);
+  const clock = useSyncExternalStore(subscribeServerClock, getClockStatus);
+  const serverOffsetMs = clock.offsetMs;
+  const clockSkew = describeClockSkew(serverOffsetMs);
   const datedMembers = members.filter((member) => parseRegistrationTime(member.createdAt) !== undefined);
   const newestRegistration = datedMembers.reduce<number | undefined>((latest, member) => {
     const ms = parseRegistrationTime(member.createdAt) as number;
@@ -925,7 +936,21 @@ function MembersSection({
           </button>
         }
       />
-      {deviceClockBehind && (
+      {clockSkew && clock.confirmed && (
+        <div role="alert" className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
+          This computer&apos;s clock is {clockSkew} the server. Registration periods use the server&apos;s
+          time (Nigeria), so the counts below are still correct. Please fix the date and time on this
+          computer.
+        </div>
+      )}
+      {clock.source === "token-window" && (
+        <div role="alert" className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
+          This computer&apos;s clock does not match your login session{clockSkew ? ` (it is ${clockSkew} the server)` : ""}
+          , and the server time could not be confirmed. Periods use an estimate, so entries near midnight
+          may be off. Fix the date and time on this computer, or sign in again.
+        </div>
+      )}
+      {deviceClockBehind && !clockSkew && (
         <div role="alert" className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
           This device&apos;s clock looks behind (a member registered after the time shown on this
           computer). Periods are being calculated from the most recent registration instead, so the
@@ -962,6 +987,9 @@ function MembersSection({
             </SelectContent>
           </Select>
           <p className="mt-1.5 text-xs text-ink-muted dark:text-[#94A3B8]">{describePeriodRange(periodRange)}</p>
+          <p data-testid="clock-source" className="mt-0.5 text-[11px] text-ink-muted/80 dark:text-[#94A3B8]">
+            Clock: {CLOCK_SOURCE_LABELS[clock.source]}
+          </p>
         </div>
       </section>      <div className="bg-white dark:bg-[#111327] rounded-2xl border border-line dark:border-white/10 overflow-hidden shadow-sm">
         <div className="p-4 border-b border-line dark:border-white/10 flex flex-col sm:flex-row gap-3">
